@@ -32,6 +32,10 @@ namespace UnityCommonEx
             message.transform.localPosition = position;
             message.transform.localScale = Vector3.one;
             message.SetContent(content);
+            
+            // SetContent 结束后启动 UITween
+            message.StartTween();
+            
             floatingMessages.Add(message);
 
             // 如果 Duration > 0，注册定时器自动回收

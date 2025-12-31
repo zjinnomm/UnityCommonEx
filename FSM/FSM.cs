@@ -1,3 +1,5 @@
+using System;
+
 namespace UnityCommonEx
 {
 
@@ -11,6 +13,11 @@ namespace UnityCommonEx
         private Properties nextProperties;
 
         public FSMState<M> State => state;
+
+        /// <summary>
+        /// 状态变化回调事件（旧状态类型，新状态类型）
+        /// </summary>
+        public event Action<int, int> OnStateChangedCallback;
 
         public FSM(int initStateType)
         {
@@ -73,7 +80,13 @@ namespace UnityCommonEx
             OnStateChanged(oldState, nextState);
         }
 
-        protected virtual void OnStateChanged(FSMState<M> originalState, FSMState<M> newState) { }
+        protected virtual void OnStateChanged(FSMState<M> originalState, FSMState<M> newState)
+        {
+            // 触发状态变化回调事件
+            int oldType = originalState != null ? originalState.Type : -1;
+            int newType = newState != null ? newState.Type : -1;
+            OnStateChangedCallback?.Invoke(oldType, newType);
+        }
 
         protected abstract FSMState<M> GetStateByType(int stateType);
 

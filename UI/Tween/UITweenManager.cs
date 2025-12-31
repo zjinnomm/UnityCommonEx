@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace UnityCommonEx
 {
@@ -26,18 +27,43 @@ namespace UnityCommonEx
             }
         }
 
-        public uint StartTween(UITweenEntry entry, UITweenObject obj, int loopTimes = 1)
+        public uint StartTween(UITweenObject obj, UITweenConfig config, float startProgress = 0f, int loopTimes = 1)
         {
             UITween tween = PrepareTween(obj, loopTimes);
-            tween.Tweens.Add(entry);
+            tween.Config = config;
+            tween.PropType = config.PropType;
+            tween.IsActive = true;
+            
+            // 设置起始进度
+            if (startProgress > 0f)
+            {
+                float duration = tween.GetDuration();
+                if (duration > 0)
+                {
+                    tween.Progress = Mathf.Clamp01(startProgress) * duration;
+                    // 立即应用当前进度状态
+                    tween.PrepareTween();
+                    tween.ApplyStateWithCurves(tween.Progress);
+                }
+            }
+            
             return tween.Id;
         }
-
-        public uint StartTween(IList<UITweenEntry> entries, UITweenObject obj, int loopTimes = 1)
+        
+        /// <summary>
+        /// 获取 Tween 的当前进度（0-1），查不到或已结束返回 1
+        /// </summary>
+        public float GetTweenProgress(uint id)
         {
-            UITween tween = PrepareTween(obj, loopTimes);
-            tween.Tweens.AddRange(entries);
-            return tween.Id;
+            for (int i = 0; i < Tweens.Count; i++)
+            {
+                UITween tween = Tweens[i];
+                if (tween.Id == id)
+                {
+                    return tween.GetProgress();
+                }
+            }
+            return 1f; // 查不到说明已结束，返回 1
         }
 
         public void StopTween(uint id, bool toLastFrame = true)
@@ -64,7 +90,6 @@ namespace UnityCommonEx
             UITween tween = InstancePool<UITween>.Instance.GetInstance();
             tween.Id = NextTweenId;
             tween.LoopTimes = loopTimes;
-            tween.TargetTweenIndex = -1;
             tween.TargetTransform = obj.TargetTransform;
             tween.GetTargetAlphaFunc = obj.GetTargetAlphaFunc;
             tween.SetTargetAlphaFunc = obj.SetTargetAlphaFunc;
@@ -74,7 +99,7 @@ namespace UnityCommonEx
             {
                 TickingManager.Register(this);
             }
-            NextTweenId ++;
+            NextTweenId++;
             return tween;
         }
 

@@ -9,12 +9,26 @@ namespace UnityCommonEx
         public Image Icon;
         public TMP_Text MainText;
         public TMP_Text SubText;
-        public Animator Animator;
+        
+        /// <summary>
+        /// UITween 配置
+        /// </summary>
+        public UITweenConfig TweenConfig;
+        
+        /// <summary>
+        /// UITween 操作的目标 RectTransform
+        /// </summary>
+        public RectTransform TweenRoot;
 
         /// <summary>
         /// 消息持续时间（秒），超过此时间后自动回收
         /// </summary>
         public float Duration;
+        
+        /// <summary>
+        /// 当前运行的 Tween ID
+        /// </summary>
+        private uint currentTweenId;
 
         public void SetContent(FloatingMessageContent content)
         {
@@ -44,18 +58,77 @@ namespace UnityCommonEx
         public override void OnPoolableTaken()
         {
             base.OnPoolableTaken();
-            
-            // 每次启动时重启动画
-            if (Animator != null)
+        }
+        
+        /// <summary>
+        /// 启动 UITween 动画
+        /// </summary>
+        public void StartTween()
+        {
+            // 停止之前的 Tween（如果存在）
+            if (currentTweenId != 0)
             {
-                Animator.Rebind();
-                Animator.Update(0f);
+                UITweenManager.Instance.StopTween(currentTweenId, false);
+                currentTweenId = 0;
+            }
+            
+            // 启动 UITween
+            if (TweenRoot != null)
+            {
+                UITweenObject tweenObj = new UITweenObject
+                {
+                    TargetTransform = TweenRoot,
+                    GetTargetAlphaFunc = GetAlpha,
+                    SetTargetAlphaFunc = SetAlpha,
+                    OnTweenFinished = null
+                };
+                
+                currentTweenId = UITweenManager.Instance.StartTween(tweenObj, TweenConfig);
             }
         }
 
         public override void OnPoolableReturned()
         {
             base.OnPoolableReturned();
+            
+            // 停止 UITween
+            if (currentTweenId != 0)
+            {
+                UITweenManager.Instance.StopTween(currentTweenId, false);
+                currentTweenId = 0;
+            }
+        }
+        
+        private float GetAlpha()
+        {
+            if (MainText != null)
+            {
+                return MainText.color.a;
+            }
+            return 1f;
+        }
+        
+        private void SetAlpha(float alpha)
+        {
+            Color color;
+            if (Icon != null)
+            {
+                color = Icon.color;
+                color.a = alpha;
+                Icon.color = color;
+            }
+            if (MainText != null)
+            {
+                color = MainText.color;
+                color.a = alpha;
+                MainText.color = color;
+            }
+            if (SubText != null)
+            {
+                color = SubText.color;
+                color.a = alpha;
+                SubText.color = color;
+            }
         }
     }
 }
