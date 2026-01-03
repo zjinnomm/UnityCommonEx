@@ -46,7 +46,7 @@ namespace UnityCommonEx
         /// <summary>
         /// 值变化回调，传出 valueChanged 数组（仅在有任何值发生变化时调用）
         /// </summary>
-        public Action<bool[]> OnValueChanged;
+        public event Action<bool[]> OnValueChanged;
 
         public AttributeSet(IAttributeSetOwner<T> owner)
         {

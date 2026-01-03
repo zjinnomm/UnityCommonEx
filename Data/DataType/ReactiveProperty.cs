@@ -11,7 +11,7 @@ namespace UnityCommonEx
     public struct ReactiveProperty<T>
     {
         private T value;
-        private Action<T, T> onChange;
+        private event Action<T, T> onChange;
         private static readonly EqualityComparer<T> comparer = EqualityComparer<T>.Default;
 
         /// <summary>
@@ -34,10 +34,10 @@ namespace UnityCommonEx
         /// <summary>
         /// 值变化回调 (oldValue, newValue)
         /// </summary>
-        public Action<T, T> OnChange
+        public event Action<T, T> OnChange
         {
-            get => onChange;
-            set => onChange = value;
+            add => onChange += value;
+            remove => onChange -= value;
         }
 
         /// <summary>
