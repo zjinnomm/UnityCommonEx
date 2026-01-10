@@ -154,7 +154,7 @@ namespace UnityCommonEx
             for (int i = 1; i < content.Count; i++)
             {
                 string[] values = content[i];
-                if (values.Length <= 1)
+                if (values.Length == 0 || (values.Length == 1 && string.IsNullOrEmpty(values[0])))
                 {
                     continue;
                 }
