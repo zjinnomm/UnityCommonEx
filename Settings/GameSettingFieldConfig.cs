@@ -1,0 +1,75 @@
+using Newtonsoft.Json;
+
+namespace UnityCommonEx
+{
+
+    /// <summary>
+    /// 游戏设置字段的配置信息（TypeReflected 基类），用于定义 UI 显示和编辑规则。
+    /// 
+    /// 通过 <see cref="GameSettingFieldType"/> + TypeReflected 机制，将不同字段类型
+    /// 映射为不同的派生配置类，例如：
+    /// - <see cref="SelectGameSettingFieldConfig"/> 对应 <see cref="GameSettingFieldType.Select"/>
+    /// </summary>
+    [JsonConverter(typeof(TypeReflectableDataTemplateConverter<GameSettingFieldConfig, GameSettingFieldType>))]
+    public abstract class GameSettingFieldConfig : TypeReflectableDataTemplate<GameSettingFieldConfig, GameSettingFieldType>
+    {
+        /// <summary>
+        /// 对应GameSetting中的字段名（必须与字段名完全匹配）
+        /// </summary>
+        public string FieldName;
+
+        /// <summary>
+        /// UI显示名称
+        /// </summary>
+        public string DisplayName;
+
+        /// <summary>
+        /// 分组名称（用于分页，相同GroupName的字段会在同一页）
+        /// </summary>
+        public string GroupName;
+
+        /// <summary>
+        /// 分组排序（数字越小越靠前）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public int GroupOrder = 0;
+
+        /// <summary>
+        /// 字段在组内排序（数字越小越靠前）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public int FieldOrder = 0;
+
+        /// <summary>
+        /// 是否在修改时触发回调（暂未使用，预留）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public bool HasCallback = false;
+
+        /// <summary>
+        /// 注册各字段类型与派生配置类的映射关系。
+        /// </summary>
+        public static void RegisterTypeReflections()
+        {
+            RegisterTypeReflection(typeof(SelectGameSettingFieldConfig), GameSettingFieldType.Select);
+        }
+
+    }
+
+    /// <summary>
+    /// Select 类型字段的配置：从若干字符串选项中选择其一。
+    /// </summary>
+    public class SelectGameSettingFieldConfig : GameSettingFieldConfig
+    {
+        /// <summary>
+        /// 选项列表（用于 Select 类型，必填）：
+        /// - 用于展示给玩家看的文本
+        /// - 同时也是写回 GameSetting 字段时的原始字符串值
+        ///   （底层通过 Convert.ChangeType 转成字段的真实类型，例如 int/bool 等）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public string[] Options;
+
+    }
+
+}
