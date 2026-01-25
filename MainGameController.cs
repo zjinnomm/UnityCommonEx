@@ -8,6 +8,10 @@ namespace UnityCommonEx
 
         public Transform NodeRoot;
 
+        [Header("Manager")]
+        public VFXManager VFXManager;
+        public AudioManager AudioManager;
+
         [Header("Data")]
         public DataLoadMethodType EditorLoadMethod = DataLoadMethodType.ScatteredFile;
         public DataLoadMethodType RuntimeLoadMethod = DataLoadMethodType.PackedResourceFile;
@@ -34,6 +38,16 @@ namespace UnityCommonEx
             else if (loadMethod == DataLoadMethodType.PackedResourceFile)
             {
                 DataManager.LoadPacked(PackedDataPath);
+            }
+
+            // 初始化通用 Manager
+            if (VFXManager != null)
+            {
+                VFXManager.Initialize();
+            }
+            if (AudioManager != null)
+            {
+                AudioManager.Initialize();
             }
 
             DontDestroyOnLoad(this);
