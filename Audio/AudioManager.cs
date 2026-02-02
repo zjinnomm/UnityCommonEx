@@ -10,7 +10,7 @@ namespace UnityCommonEx
     /// - 单例控制器，常驻场景
     /// - 通过 SFXConfigRow 配置音效 Key 与资源路径
     /// - 通过 BGMConfigRow 配置背景音乐 Key 与资源路径
-    /// - 提供 PlaySFX(key, pitch) 播放音效
+    /// - 提供 PlaySFX(key, pitch, suppressDuration) 播放音效
     /// - 提供 PlayBGM(key) / StopBGM() 管理背景音乐
     /// - 内部使用 AudioSource 池，播放结束后回收到池中
     /// </summary>
@@ -49,6 +49,15 @@ namespace UnityCommonEx
 
         private readonly List<PlayingSFX> playingSources = new List<PlayingSFX>();
 
+        /// <summary>
+        /// 同名音效压制：上一帧播放过的 key（SuppressDuration == 0 时用）
+        /// </summary>
+        private readonly Dictionary<string, int> sfxLastPlayFrame = new Dictionary<string, int>();
+        /// <summary>
+        /// 同名音效压制：该 key 在此时间前不再播放（SuppressDuration > 0 时用）
+        /// </summary>
+        private readonly Dictionary<string, float> sfxSuppressUntil = new Dictionary<string, float>();
+
         // BGM 相关
         private AudioSource bgmSource;
         private string currentBGMKey;
@@ -80,23 +89,41 @@ namespace UnityCommonEx
         /// <summary>
         /// 播放指定 Key 的音效
         /// </summary>
-        public void PlaySFX(string key, float pitch = 1f)
+        /// <param name="key">音效 Key</param>
+        /// <param name="pitch">音高</param>
+        /// <param name="suppressDuration">同名音效压制：&lt;0 不压制，=0 本帧压制，&gt;0 该时长（秒）内压制</param>
+        /// <returns>是否成功播放</returns>
+        public bool PlaySFX(string key, float pitch = 1f, float suppressDuration = 0f)
         {
             if (string.IsNullOrEmpty(key))
             {
-                return;
+                return false;
+            }
+
+            if (suppressDuration >= 0f)
+            {
+                if (suppressDuration == 0f)
+                {
+                    if (sfxLastPlayFrame.TryGetValue(key, out int lastFrame) && lastFrame == Time.frameCount)
+                        return false;
+                }
+                else
+                {
+                    if (sfxSuppressUntil.TryGetValue(key, out float until) && Time.time < until)
+                        return false;
+                }
             }
 
             AudioClip clip = GetOrLoadClip(key);
             if (clip == null)
             {
-                return;
+                return false;
             }
 
             AudioSource source = GetAudioSource();
             if (source == null)
             {
-                return;
+                return false;
             }
 
             source.clip = clip;
@@ -105,6 +132,16 @@ namespace UnityCommonEx
             source.Play();
 
             playingSources.Add(new PlayingSFX { Source = source });
+
+            if (suppressDuration >= 0f)
+            {
+                if (suppressDuration == 0f)
+                    sfxLastPlayFrame[key] = Time.frameCount;
+                else
+                    sfxSuppressUntil[key] = Time.time + suppressDuration;
+            }
+
+            return true;
         }
 
         #region BGM
