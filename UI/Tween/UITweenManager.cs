@@ -33,20 +33,23 @@ namespace UnityCommonEx
             tween.Config = config;
             tween.PropType = config.PropType;
             tween.IsActive = true;
-            
-            // 设置起始进度
+
             if (startProgress > 0f)
             {
                 float duration = tween.GetDuration();
                 if (duration > 0)
                 {
                     tween.Progress = Mathf.Clamp01(startProgress) * duration;
-                    // 立即应用当前进度状态
                     tween.PrepareTween();
                     tween.ApplyStateWithCurves(tween.Progress);
                 }
             }
-            
+            else
+            {
+                // 立即应用 t=0 的初始状态，避免回收复用时首帧仍显示上一轮 Tween 结束位置
+                tween.PrepareTween();
+            }
+
             return tween.Id;
         }
         
