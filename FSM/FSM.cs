@@ -60,6 +60,14 @@ namespace UnityCommonEx
             }
         }
 
+        /// <summary>
+        /// 强制切换到指定状态（不经过当前状态 OnEvent，用于 Debug 等）
+        /// </summary>
+        public void ForceGoToState(int stateType, Properties properties = null)
+        {
+            ChangeState(stateType, properties);
+        }
+
         protected virtual void ChangeState(int stateType, Properties properties = null)
         {
             FSMState<M> oldState = state;
