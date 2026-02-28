@@ -55,6 +55,11 @@ namespace UnityCommonEx
         private readonly Dictionary<string, GameObject> _tabs = new Dictionary<string, GameObject>();
 
         /// <summary>
+        /// 当前是否已根据模板生成过 UI（用于语言切换后判断是否需要重载）
+        /// </summary>
+        public bool IsGenerated => _currentTemplate != null;
+
+        /// <summary>
         /// 根据模板生成UI
         /// </summary>
         /// <typeparam name="T">设置类型</typeparam>
@@ -153,7 +158,7 @@ namespace UnityCommonEx
                 return;
             }
             entry.name = $"Entry_{config.FieldName}";
-            entry.SetLabel(config.DisplayName);
+            entry.SetLabel(config.DisplayName != null ? config.DisplayName.GetText() : config.FieldName);
 
             // 2. 创建 Select 控件到 Entry 的 SettingItemRoot 下
             var selectParent = entry.GetSettingItemRoot();
@@ -175,7 +180,16 @@ namespace UnityCommonEx
             }
 
             var options = selectConfig.Options ?? Array.Empty<string>();
-            selectItem.SetOptions(options);
+            string[] displayTexts = options;
+            if (selectConfig.DisplayOptions != null && selectConfig.DisplayOptions.Length == options.Length)
+            {
+                displayTexts = new string[options.Length];
+                for (int i = 0; i < options.Length; i++)
+                {
+                    displayTexts[i] = selectConfig.DisplayOptions[i]?.GetText() ?? options[i];
+                }
+            }
+            selectItem.SetOptions(displayTexts);
 
             // 根据当前 GameSetting 值计算初始索引
             int initialIndex = 0;

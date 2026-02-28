@@ -98,7 +98,7 @@ namespace UnityCommonEx
 
         public static IList<string[]> ReadCsv(string path)
         {
-            return Read(System.IO.File.ReadAllLines(path));
+            return Read(System.IO.File.ReadAllLines(path, Encoding.UTF8));
         }
 
     }

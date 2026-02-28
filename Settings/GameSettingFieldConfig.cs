@@ -19,9 +19,9 @@ namespace UnityCommonEx
         public string FieldName;
 
         /// <summary>
-        /// UI显示名称
+        /// UI 显示名称（多语言）
         /// </summary>
-        public string DisplayName;
+        public MultiLingualText DisplayName;
 
         /// <summary>
         /// 分组名称（用于分页，相同GroupName的字段会在同一页）
@@ -39,12 +39,6 @@ namespace UnityCommonEx
         /// </summary>
         [JsonProperty(Required = Required.Default)]
         public int FieldOrder = 0;
-
-        /// <summary>
-        /// 是否在修改时触发回调（暂未使用，预留）
-        /// </summary>
-        [JsonProperty(Required = Required.Default)]
-        public bool HasCallback = false;
 
         /// <summary>
         /// 字段值改变或首次加载完配置后调用的静态方法（格式 ClassName.MethodName，签名 void Method(object value)）
@@ -68,13 +62,16 @@ namespace UnityCommonEx
     public class SelectGameSettingFieldConfig : GameSettingFieldConfig
     {
         /// <summary>
-        /// 选项列表（用于 Select 类型，必填）：
-        /// - 用于展示给玩家看的文本
-        /// - 同时也是写回 GameSetting 字段时的原始字符串值
-        ///   （底层通过 Convert.ChangeType 转成字段的真实类型，例如 int/bool 等）
+        /// 选项值列表（用于 Select 类型，必填）：写回 GameSetting 的原始字符串值，底层通过 Convert.ChangeType 转成字段类型。
         /// </summary>
         [JsonProperty(Required = Required.Default)]
         public string[] Options;
+
+        /// <summary>
+        /// 选项的显示文案（多语言），与 Options 一一对应；若为 null 或长度不一致则用 Options 作为显示。
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public MultiLingualText[] DisplayOptions;
 
     }
 

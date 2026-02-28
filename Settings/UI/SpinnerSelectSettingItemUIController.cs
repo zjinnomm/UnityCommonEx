@@ -97,19 +97,10 @@ namespace UnityCommonEx
                 return;
             }
 
-            // 已经在最左侧，忽略点击
-            if (_selectedIndex <= 0)
-            {
-                return;
-            }
-
-            int newIndex = _selectedIndex - 1;
-            if (newIndex != _selectedIndex)
-            {
-                _selectedIndex = newIndex;
-                UpdateDisplay();
-                RaiseSelectedIndexChanged(_selectedIndex);
-            }
+            int newIndex = _selectedIndex <= 0 ? _options.Length - 1 : _selectedIndex - 1;
+            _selectedIndex = newIndex;
+            UpdateDisplay();
+            RaiseSelectedIndexChanged(_selectedIndex);
         }
 
         private void OnRightClicked()
@@ -119,19 +110,10 @@ namespace UnityCommonEx
                 return;
             }
 
-            // 已经在最右侧，忽略点击
-            if (_selectedIndex >= _options.Length - 1)
-            {
-                return;
-            }
-
-            int newIndex = _selectedIndex + 1;
-            if (newIndex != _selectedIndex)
-            {
-                _selectedIndex = newIndex;
-                UpdateDisplay();
-                RaiseSelectedIndexChanged(_selectedIndex);
-            }
+            int newIndex = _selectedIndex >= _options.Length - 1 ? 0 : _selectedIndex + 1;
+            _selectedIndex = newIndex;
+            UpdateDisplay();
+            RaiseSelectedIndexChanged(_selectedIndex);
         }
 
         private void UpdateDisplay()
@@ -150,15 +132,15 @@ namespace UnityCommonEx
                 }
             }
 
-            // 左右按钮可用状态：最左禁用 Left，最右禁用 Right
+            // 有选项时左右按钮始终可点，两端会绕到另一端
             bool hasOptions = _options != null && _options.Length > 0;
             if (LeftButton != null)
             {
-                LeftButton.interactable = hasOptions && _selectedIndex > 0;
+                LeftButton.interactable = hasOptions;
             }
             if (RightButton != null)
             {
-                RightButton.interactable = hasOptions && _selectedIndex < (_options.Length - 1);
+                RightButton.interactable = hasOptions;
             }
         }
     }
