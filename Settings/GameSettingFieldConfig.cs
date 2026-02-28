@@ -47,6 +47,12 @@ namespace UnityCommonEx
         public bool HasCallback = false;
 
         /// <summary>
+        /// 字段值改变或首次加载完配置后调用的静态方法（格式 ClassName.MethodName，签名 void Method(object value)）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public CachedStaticMethodRef OnChangedFunc;
+
+        /// <summary>
         /// 注册各字段类型与派生配置类的映射关系。
         /// </summary>
         public static void RegisterTypeReflections()

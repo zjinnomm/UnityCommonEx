@@ -48,6 +48,37 @@ namespace UnityCommonEx
         }
 
         /// <summary>
+        /// 根据模板应用字段的 OnChangedFunc：注册变更回调，并在加载完成后对每个配置了 OnChangedFunc 的字段调用一次。
+        /// 应在 Initialize 之后、由持有 template 的调用方执行（如游戏入口或设置 UI 打开时）。
+        /// </summary>
+        public void ApplyFieldCallbacks(GameSettingTemplate template)
+        {
+            if (template?.Fields == null)
+                return;
+
+            foreach (var fieldConfig in template.Fields)
+            {
+                if (fieldConfig?.OnChangedFunc == null || string.IsNullOrEmpty(fieldConfig.OnChangedFunc.Function))
+                    continue;
+
+                string fieldName = fieldConfig.FieldName;
+                if (!_fieldCache.ContainsKey(fieldName))
+                    continue;
+
+                fieldConfig.OnChangedFunc.Init(new[] { typeof(object) }, typeof(void), $"{typeof(T).Name}.{fieldName}");
+
+                RegisterCallback(fieldName, value =>
+                {
+                    fieldConfig.OnChangedFunc.TryInvoke(new[] { value }, out _);
+                });
+
+                object currentValue = GetValue(fieldName);
+                if (currentValue != null)
+                    fieldConfig.OnChangedFunc.TryInvoke(new[] { currentValue }, out _);
+            }
+        }
+
+        /// <summary>
         /// 缓存所有字段信息
         /// </summary>
         private void CacheFields()
