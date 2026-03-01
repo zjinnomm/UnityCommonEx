@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -27,9 +27,27 @@ namespace UnityCommonEx
         public void Message(FloatingMessageContent content, Vector2 relativePos)
         {
             FloatingMessageController message = InstancePool<FloatingMessageController>.Instance.GetInstance(() => Create<FloatingMessageController>(MessagePrefab, transform));
-            Vector2 canvasSize = canvasScaler.referenceResolution;
-            Vector2 position = new Vector2(relativePos.x * canvasSize.x, relativePos.y * canvasSize.y);
-            message.transform.localPosition = position;
+            RectTransform hubRect = transform as RectTransform;
+            if (hubRect != null)
+            {
+                Vector2 screenPoint = new Vector2(relativePos.x * Screen.width, relativePos.y * Screen.height);
+                Canvas canvas = canvasScaler.GetComponent<Canvas>();
+                Camera cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+                if (RectTransformUtility.ScreenPointToLocalPointInRectangle(hubRect, screenPoint, cam, out Vector2 localPoint))
+                {
+                    message.transform.localPosition = localPoint;
+                }
+                else
+                {
+                    Vector2 canvasSize = canvasScaler.referenceResolution;
+                    message.transform.localPosition = new Vector2(relativePos.x * canvasSize.x, relativePos.y * canvasSize.y);
+                }
+            }
+            else
+            {
+                Vector2 canvasSize = canvasScaler.referenceResolution;
+                message.transform.localPosition = new Vector2(relativePos.x * canvasSize.x, relativePos.y * canvasSize.y);
+            }
             message.transform.localScale = Vector3.one;
             message.SetContent(content);
             
