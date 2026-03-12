@@ -104,22 +104,29 @@ namespace UnityCommonEx
 
         public static void LoadSingle(string path)
         {
-            if (Entries == null)
+            try
             {
-                Entries = new Dictionary<string, DataTable<TK, TR>>(StringComparer.OrdinalIgnoreCase);
+                if (Entries == null)
+                {
+                    Entries = new Dictionary<string, DataTable<TK, TR>>(StringComparer.OrdinalIgnoreCase);
+                }
+                DataTable<TK, TR> table = DataTable.Create<TK, TR>(path);
+                table.Id = Path.GetFileName(path).Split(".")[0];
+                
+                if (Entries.ContainsKey(table.Id))
+                {
+                    LogUtil.Warn("already load table of id {0}", table.Id);
+                    Entries[table.Id] = table;
+                }
+                else {
+                    Entries.Add(table.Id, table);
+                }
+                DefaultEntry = table;
             }
-            DataTable<TK, TR> table = DataTable.Create<TK, TR>(path);
-            table.Id = Path.GetFileName(path).Split(".")[0];
-            
-            if (Entries.ContainsKey(table.Id))
+            catch (Exception ex)
             {
-                LogUtil.Warn("already load table of id {0}", table.Id);
-                Entries[table.Id] = table;
+                LogUtil.Error("DataTable LoadSingle 失败, 文件: {0}, 错误: {1}", path, ex);
             }
-            else {
-                Entries.Add(table.Id, table);
-            }
-            DefaultEntry = table;
         }
 
         public static void LoadExt(string path, string ext)

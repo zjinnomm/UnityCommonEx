@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -109,32 +109,40 @@ namespace UnityCommonEx
 
         public static T LoadSingle(string path)
         {
-            if (Entries == null)
+            try
             {
-                Entries = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+                if (Entries == null)
+                {
+                    Entries = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+                }
+                var entry = JsonUtil.Read<T>(path);
+                if (entry == null)
+                {
+                    LogUtil.Error("DataTemplate {0} 文件加载为 null, 文件: {1}", typeof(T), path);
+                    return default;
+                }
+                entry.PostInit();
+                if (entry.Id == null)
+                {
+                    entry.Id = Path.GetFileName(path).Split(".")[0];
+                }
+                if (Entries.ContainsKey(entry.Id))
+                {
+                    LogUtil.Warn("{0} load duplicate entry {1}", typeof(T).Name, entry.Id);
+                    Entries[entry.Id] = entry;
+                }
+                else
+                {
+                    Entries.Add(entry.Id, entry);
+                }
+                DefaultEntry = entry;
+                return entry;
             }
-            var entry = JsonUtil.Read<T>(path);
-            if (entry == null)
+            catch (Exception ex)
             {
-                LogUtil.Error("DataTemplate {0} {1} Error: {2}", typeof(T), path, "null");
-                return null;
+                LogUtil.Error("DataTemplate LoadSingle 失败, 类型: {0}, 文件: {1}, 错误: {2}", typeof(T).Name, path, ex);
+                return default;
             }
-            entry.PostInit();
-            if (entry.Id == null)
-            {
-                entry.Id = Path.GetFileName(path).Split(".")[0];
-            }
-            if (Entries.ContainsKey(entry.Id))
-            {
-                LogUtil.Warn("{0} load duplicate entry {1}", typeof(T).Name, entry.Id);
-                Entries[entry.Id] = entry;
-            }
-            else
-            {
-                Entries.Add(entry.Id, entry);
-            }
-            DefaultEntry = entry;
-            return entry;
         }
 
         public static void LoadExt(string path, string ext)
