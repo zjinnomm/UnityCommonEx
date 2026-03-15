@@ -56,6 +56,16 @@ namespace UnityCommonEx
         /// </summary>
         private Action currentConfirmCallback;
 
+        /// <summary>
+        /// 当前取消按钮回调（点击取消按钮时调用）
+        /// </summary>
+        private Action currentCancelCallback;
+
+        /// <summary>
+        /// 当前点击背景回调（点击背景关闭时调用，若为 null 则与取消按钮行为一致）
+        /// </summary>
+        private Action currentBackgroundCallback;
+
         protected override void OnInit()
         {
             base.OnInit();
@@ -67,11 +77,11 @@ namespace UnityCommonEx
             }
             if (CancelButton != null)
             {
-                CancelButton.onClick.AddListener(OnCancelClicked);
+                CancelButton.onClick.AddListener(OnCancelButtonClicked);
             }
             if (BackgroundButton != null)
             {
-                BackgroundButton.onClick.AddListener(OnCancelClicked);
+                BackgroundButton.onClick.AddListener(OnBackgroundClicked);
             }
 
             // 初始状态隐藏对话框
@@ -94,11 +104,11 @@ namespace UnityCommonEx
             }
             if (CancelButton != null)
             {
-                CancelButton.onClick.RemoveListener(OnCancelClicked);
+                CancelButton.onClick.RemoveListener(OnCancelButtonClicked);
             }
             if (BackgroundButton != null)
             {
-                BackgroundButton.onClick.RemoveListener(OnCancelClicked);
+                BackgroundButton.onClick.RemoveListener(OnBackgroundClicked);
             }
 
             base.OnRelease();
@@ -111,11 +121,15 @@ namespace UnityCommonEx
         /// <param name="hint">提示文本</param>
         /// <param name="confirmCallback">确认回调</param>
         /// <param name="rect">目标Rect（屏幕坐标）</param>
-        public void ShowDialogPanel(string hint, Action confirmCallback, Rect rect)
+        /// <param name="cancelCallback">取消回调（点击取消按钮时调用，可选）</param>
+        /// <param name="backgroundCallback">点击背景时的回调（可选；为 null 时与取消按钮同用 cancelCallback）</param>
+        public void ShowDialogPanel(string hint, Action confirmCallback, Rect rect, Action cancelCallback = null, Action backgroundCallback = null)
         {
             if (DialogPanel == null) return;
 
             currentConfirmCallback = confirmCallback;
+            currentCancelCallback = cancelCallback;
+            currentBackgroundCallback = backgroundCallback;
 
             // 更新提示文本
             if (HintText != null)
@@ -168,7 +182,6 @@ namespace UnityCommonEx
             {
                 DialogPanel.gameObject.SetActive(false);
             }
-            currentConfirmCallback = null;
         }
 
         protected override void OnDeactivate()
@@ -327,25 +340,40 @@ namespace UnityCommonEx
         /// </summary>
         private void OnConfirmClicked()
         {
+            // 隐藏对话框并关闭
+            HideDialog();
+            Deactivate();
             // 执行确认回调
             if (currentConfirmCallback != null)
             {
                 currentConfirmCallback.Invoke();
             }
-
-            // 隐藏对话框并关闭
-            HideDialog();
-            Deactivate();
         }
 
         /// <summary>
-        /// 取消按钮点击事件（也用于背景按钮）
+        /// 取消按钮点击事件
         /// </summary>
-        private void OnCancelClicked()
+        private void OnCancelButtonClicked()
         {
-            // 隐藏对话框并关闭（不执行确认回调）
             HideDialog();
             Deactivate();
+            if (currentCancelCallback != null)
+            {
+                currentCancelCallback.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// 背景点击事件（点击别处关闭）
+        /// </summary>
+        private void OnBackgroundClicked()
+        {
+            HideDialog();
+            Deactivate();
+            if (currentBackgroundCallback != null)
+            {
+                currentBackgroundCallback.Invoke();
+            }
         }
     }
 }
