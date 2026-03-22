@@ -137,11 +137,9 @@ namespace UnityCommonEx
                 HintText.text = hint ?? string.Empty;
             }
 
-            // 计算并设置位置
-            SetPanelPosition(rect);
-
-            // 显示对话框
+            // 显示后再算布局与位置（与 DetailPanel 一致：屏幕像素 rect 与面板尺寸同坐标系）
             DialogPanel.gameObject.SetActive(true);
+            SetPanelPosition(rect);
         }
 
         /// <summary>
@@ -212,62 +210,53 @@ namespace UnityCommonEx
         /// <summary>
         /// 确定显示侧边（左边或右边）
         /// </summary>
-        private DisplaySide DetermineDisplaySide(Rect rect)
+        private DisplaySide DetermineDisplaySide(Rect rect, Vector2 panelScreenPixelSize)
         {
-            // 获取 Panel 的尺寸
-            Vector2 panelSize = GetPanelSize();
-
-            // 如果 rect 的 x1 > w' + padding，说明可以显示在左边
-            if (rect.x > panelSize.x + Padding)
-            {
+            if (rect.x > panelScreenPixelSize.x + Padding)
                 return DisplaySide.Left;
-            }
-            else
-            {
-                return DisplaySide.Right;
-            }
+            return DisplaySide.Right;
         }
 
         /// <summary>
         /// 确定对齐方式（上边缘或下边缘）
         /// </summary>
-        private DisplayAlign DetermineDisplayAlign(Rect rect)
+        private DisplayAlign DetermineDisplayAlign(Rect rect, Vector2 panelScreenPixelSize)
         {
-            // 获取 Panel 的尺寸
-            Vector2 panelSize = GetPanelSize();
-
-            // rect.y2 = rect.y + rect.height（屏幕坐标系，y 从下往上）
-            // 如果 rect.y2 > h' + padding，说明可以上边缘对齐
             float rectTop = rect.y + rect.height;
-            if (rectTop > panelSize.y + Padding)
-            {
+            if (rectTop > panelScreenPixelSize.y + Padding)
                 return DisplayAlign.Top;
-            }
-            else
-            {
-                return DisplayAlign.Bottom;
-            }
+            return DisplayAlign.Bottom;
+        }
+
+        private void RefreshDialogPanelLayout()
+        {
+            if (DialogPanel == null)
+                return;
+
+            Canvas.ForceUpdateCanvases();
+            var rects = DialogPanel.GetComponentsInChildren<RectTransform>(true);
+            for (int i = rects.Length - 1; i >= 0; i--)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(rects[i]);
+            Canvas.ForceUpdateCanvases();
         }
 
         /// <summary>
-        /// 获取 Panel 的尺寸
+        /// DialogPanel 在当前画布下的屏幕像素尺寸
         /// </summary>
-        private Vector2 GetPanelSize()
+        private Vector2 GetDialogPanelScreenPixelSize(Canvas canvas)
         {
             if (DialogPanel == null)
-            {
                 return Vector2.zero;
-            }
 
-            Vector2 panelSize = DialogPanel.sizeDelta;
-            if (panelSize.x == 0 || panelSize.y == 0)
-            {
-                // 如果尺寸为0，尝试获取布局后的尺寸
-                Canvas.ForceUpdateCanvases();
-                panelSize = DialogPanel.rect.size;
-            }
+            Vector3[] corners = new Vector3[4];
+            DialogPanel.GetWorldCorners(corners);
+            Camera cam = null;
+            if (canvas != null && (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace))
+                cam = canvas.worldCamera ?? Camera.main;
 
-            return panelSize;
+            Vector2 min = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
+            Vector2 max = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
+            return new Vector2(max.x - min.x, max.y - min.y);
         }
 
         /// <summary>
@@ -287,12 +276,15 @@ namespace UnityCommonEx
                 return;
             }
 
-            // 确定显示位置（左边或右边，上边缘或下边缘对齐）
-            DisplaySide side = DetermineDisplaySide(rect);
-            DisplayAlign align = DetermineDisplayAlign(rect);
+            RefreshDialogPanelLayout();
 
-            // 获取 Panel 的尺寸
-            Vector2 panelSize = GetPanelSize();
+            Vector2 panelScreenSize = GetDialogPanelScreenPixelSize(canvas);
+            DisplaySide side = DetermineDisplaySide(rect, panelScreenSize);
+            DisplayAlign align = DetermineDisplayAlign(rect, panelScreenSize);
+
+            Camera eventCam = null;
+            if (canvas.renderMode == RenderMode.ScreenSpaceCamera || canvas.renderMode == RenderMode.WorldSpace)
+                eventCam = canvas.worldCamera ?? Camera.main;
 
             // 计算目标位置（屏幕坐标）
             Vector2 targetScreenPos = Vector2.zero;
@@ -329,10 +321,62 @@ namespace UnityCommonEx
                 DialogPanel.pivot = new Vector2(DialogPanel.pivot.x, 0f);
             }
 
-            // 将屏幕坐标转换为 Canvas 本地坐标
+            // 将屏幕坐标转换为 Canvas 根节点本地坐标
             Vector2 localPos;
-            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, targetScreenPos, canvas.worldCamera, out localPos);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, targetScreenPos, eventCam, out localPos);
             DialogPanel.anchoredPosition = localPos;
+
+            ClampDialogPanelToScreenEdges(eventCam);
+        }
+
+        /// <summary>
+        /// 将已定位的 Panel 整体平移，使屏幕像素包围盒落在安全区内。
+        /// </summary>
+        private void ClampDialogPanelToScreenEdges(Camera eventCam)
+        {
+            if (DialogPanel == null)
+                return;
+
+            RectTransform parentRt = DialogPanel.parent as RectTransform;
+            if (parentRt == null)
+                return;
+
+            const float edgePad = 4f;
+            float minX = edgePad;
+            float maxX = Screen.width - edgePad;
+            float minY = edgePad;
+            float maxY = Screen.height - edgePad;
+
+            Vector3[] corners = new Vector3[4];
+            DialogPanel.GetWorldCorners(corners);
+            float sMinX = float.PositiveInfinity, sMaxX = float.NegativeInfinity;
+            float sMinY = float.PositiveInfinity, sMaxY = float.NegativeInfinity;
+            for (int i = 0; i < 4; i++)
+            {
+                Vector2 sp = RectTransformUtility.WorldToScreenPoint(eventCam, corners[i]);
+                if (sp.x < sMinX) sMinX = sp.x;
+                if (sp.x > sMaxX) sMaxX = sp.x;
+                if (sp.y < sMinY) sMinY = sp.y;
+                if (sp.y > sMaxY) sMaxY = sp.y;
+            }
+
+            float dx = 0f, dy = 0f;
+            if (sMinX < minX) dx = minX - sMinX;
+            else if (sMaxX > maxX) dx = maxX - sMaxX;
+            if (sMinY < minY) dy = minY - sMinY;
+            else if (sMaxY > maxY) dy = maxY - sMaxY;
+
+            if (Mathf.Approximately(dx, 0f) && Mathf.Approximately(dy, 0f))
+                return;
+
+            Vector2 screenRef = RectTransformUtility.WorldToScreenPoint(eventCam, corners[0]);
+            Vector2 screenRef2 = screenRef + new Vector2(dx, dy);
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRt, screenRef, eventCam, out Vector2 local0))
+                return;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(parentRt, screenRef2, eventCam, out Vector2 local1))
+                return;
+
+            DialogPanel.anchoredPosition += local1 - local0;
         }
 
         /// <summary>
