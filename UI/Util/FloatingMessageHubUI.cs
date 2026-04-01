@@ -27,6 +27,7 @@ namespace UnityCommonEx
         public void Message(FloatingMessageContent content, Vector2 relativePos)
         {
             FloatingMessageController message = InstancePool<FloatingMessageController>.Instance.GetInstance(() => Create<FloatingMessageController>(MessagePrefab, transform));
+            message.transform.SetAsLastSibling();
             RectTransform hubRect = transform as RectTransform;
             if (hubRect != null)
             {
