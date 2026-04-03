@@ -128,6 +128,22 @@ namespace UnityCommonEx
                                     list.Add(elementResolver.Invoke(s));
                                 };
                             }
+                            else if (field.FieldType == typeof(MultiLingualText))
+                            {
+                                if (Enum.TryParse<LanguageType>(subTitle, true, out var langType))
+                                {
+                                    fieldActions[i] = (s, row) =>
+                                    {
+                                        var ml = field.GetValue(row) as MultiLingualText;
+                                        if (ml == null)
+                                        {
+                                            ml = new MultiLingualText();
+                                            field.SetValueOptimized(row, ml);
+                                        }
+                                        ml._map[langType] = s;
+                                    };
+                                }
+                            }
                             break;
                         }
                     }
