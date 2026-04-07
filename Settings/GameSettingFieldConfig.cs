@@ -52,6 +52,7 @@ namespace UnityCommonEx
         public static void RegisterTypeReflections()
         {
             RegisterTypeReflection(typeof(SelectGameSettingFieldConfig), GameSettingFieldType.Select);
+            RegisterTypeReflection(typeof(NumberGameSettingFieldConfig), GameSettingFieldType.Number);
         }
 
     }
@@ -73,6 +74,36 @@ namespace UnityCommonEx
         [JsonProperty(Required = Required.Default)]
         public MultiLingualText[] DisplayOptions;
 
+    }
+
+    /// <summary>
+    /// Number 类型字段的配置：在 Min-Max 范围内按 Step 调整数值。
+    /// </summary>
+    public class NumberGameSettingFieldConfig : GameSettingFieldConfig
+    {
+        /// <summary>
+        /// 最小值（默认 0）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public float Min = 0f;
+
+        /// <summary>
+        /// 最大值（默认 100）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public float Max = 100f;
+
+        /// <summary>
+        /// 步进（默认 1）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public float Step = 1f;
+
+        /// <summary>
+        /// 默认值（默认 100）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public float Default = 100f;
     }
 
 }

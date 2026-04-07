@@ -30,6 +30,12 @@ namespace UnityCommonEx
         public GameObject SelectItemPrefab;
 
         /// <summary>
+        /// Number 类型字段的 UI 预制体：
+        /// - 根节点需挂载 <see cref="NumberSettingItemUIController"/>（例如 <see cref="SliderNumberSettingItemUIController"/>）
+        /// </summary>
+        public GameObject NumberItemPrefab;
+
+        /// <summary>
         /// 字段条目容器：所有 Label + SelectItem 都会实例化为其子节点
         /// </summary>
         [Header("UI容器")]
@@ -128,25 +134,13 @@ namespace UnityCommonEx
         }
 
         /// <summary>
-        /// 创建字段 UI（目前仅支持 Select 类型）
+        /// 创建字段 UI（支持 Select / Number）
         /// </summary>
         private void CreateFieldUI(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
         {
-            if (config.Type != GameSettingFieldType.Select)
-            {
-                LogUtil.Error("GameSettingUIController: Unsupported field type {0}", config.Type);
-                return;
-            }
-
             if (SettingEntryItemPrefab == null)
             {
                 LogUtil.Error("GameSettingUIController: SettingEntryItemPrefab is not configured");
-                return;
-            }
-
-            if (SelectItemPrefab == null)
-            {
-                LogUtil.Error("GameSettingUIController: SelectItemPrefab is not configured");
                 return;
             }
 
@@ -160,66 +154,124 @@ namespace UnityCommonEx
             entry.name = $"Entry_{config.FieldName}";
             entry.SetLabel(config.DisplayName != null ? config.DisplayName.GetText() : config.FieldName);
 
-            // 2. 创建 Select 控件到 Entry 的 SettingItemRoot 下
-            var selectParent = entry.GetSettingItemRoot();
+            var itemParent = entry.GetSettingItemRoot();
 
-            var selectItem = NodeController.Create<SelectSettingItemUIController>(SelectItemPrefab, selectParent);
-            if (selectItem == null)
+            if (config.Type == GameSettingFieldType.Select)
             {
-                LogUtil.Error("GameSettingUIController: SelectItemPrefab for field {0} does not have a SelectSettingItemUIController", config.FieldName);
-                return;
-            }
-            selectItem.name = $"Select_{config.FieldName}";
-
-            // 配置选项
-            var selectConfig = config as SelectGameSettingFieldConfig;
-            if (selectConfig == null)
-            {
-                LogUtil.Error("GameSettingUIController: Config for field {0} is not SelectGameSettingFieldConfig", config.FieldName);
-                return;
-            }
-
-            var options = selectConfig.Options ?? Array.Empty<string>();
-            string[] displayTexts = options;
-            if (selectConfig.DisplayOptions != null && selectConfig.DisplayOptions.Length == options.Length)
-            {
-                displayTexts = new string[options.Length];
-                for (int i = 0; i < options.Length; i++)
+                if (SelectItemPrefab == null)
                 {
-                    displayTexts[i] = selectConfig.DisplayOptions[i]?.GetText() ?? options[i];
-                }
-            }
-            selectItem.SetOptions(displayTexts);
-
-            // 根据当前 GameSetting 值计算初始索引
-            int initialIndex = 0;
-            if (options.Length > 0)
-            {
-                object currentValue = manager.GetValue(config.FieldName);
-                if (currentValue != null)
-                {
-                    string currentStr = Convert.ToString(currentValue);
-                    int found = Array.IndexOf(options, currentStr);
-                    if (found >= 0)
-                    {
-                        initialIndex = found;
-                    }
-                }
-            }
-            selectItem.SetSelectedIndex(initialIndex);
-
-            // 3. 订阅变更事件，写回 GameSetting
-            selectItem.OnSelectedIndexChanged += index =>
-            {
-                if (index < 0 || index >= options.Length)
-                {
+                    LogUtil.Error("GameSettingUIController: SelectItemPrefab is not configured");
                     return;
                 }
 
-                string selectedStr = options[index];
-                // 直接写入字符串，底层 GameSettingManager 会根据字段类型做 Convert.ChangeType
-                manager.SetValue(config.FieldName, selectedStr);
-            };
+                // 2. 创建 Select 控件到 Entry 的 SettingItemRoot 下
+                var selectItem = NodeController.Create<SelectSettingItemUIController>(SelectItemPrefab, itemParent);
+                if (selectItem == null)
+                {
+                    LogUtil.Error("GameSettingUIController: SelectItemPrefab for field {0} does not have a SelectSettingItemUIController", config.FieldName);
+                    return;
+                }
+                selectItem.name = $"Select_{config.FieldName}";
+
+                // 配置选项
+                var selectConfig = config as SelectGameSettingFieldConfig;
+                if (selectConfig == null)
+                {
+                    LogUtil.Error("GameSettingUIController: Config for field {0} is not SelectGameSettingFieldConfig", config.FieldName);
+                    return;
+                }
+
+                var options = selectConfig.Options ?? Array.Empty<string>();
+                string[] displayTexts = options;
+                if (selectConfig.DisplayOptions != null && selectConfig.DisplayOptions.Length == options.Length)
+                {
+                    displayTexts = new string[options.Length];
+                    for (int i = 0; i < options.Length; i++)
+                    {
+                        displayTexts[i] = selectConfig.DisplayOptions[i]?.GetText() ?? options[i];
+                    }
+                }
+                selectItem.SetOptions(displayTexts);
+
+                // 根据当前 GameSetting 值计算初始索引
+                int initialIndex = 0;
+                if (options.Length > 0)
+                {
+                    object currentValue = manager.GetValue(config.FieldName);
+                    if (currentValue != null)
+                    {
+                        string currentStr = Convert.ToString(currentValue);
+                        int found = Array.IndexOf(options, currentStr);
+                        if (found >= 0)
+                        {
+                            initialIndex = found;
+                        }
+                    }
+                }
+                selectItem.SetSelectedIndex(initialIndex);
+
+                // 3. 订阅变更事件，写回 GameSetting
+                selectItem.OnSelectedIndexChanged += index =>
+                {
+                    if (index < 0 || index >= options.Length)
+                    {
+                        return;
+                    }
+
+                    string selectedStr = options[index];
+                    // 直接写入字符串，底层 GameSettingManager 会根据字段类型做 Convert.ChangeType
+                    manager.SetValue(config.FieldName, selectedStr);
+                };
+            }
+            else if (config.Type == GameSettingFieldType.Number)
+            {
+                if (NumberItemPrefab == null)
+                {
+                    LogUtil.Error("GameSettingUIController: NumberItemPrefab is not configured");
+                    return;
+                }
+
+                var numberItem = NodeController.Create<NumberSettingItemUIController>(NumberItemPrefab, itemParent);
+                if (numberItem == null)
+                {
+                    LogUtil.Error("GameSettingUIController: NumberItemPrefab for field {0} does not have a NumberSettingItemUIController", config.FieldName);
+                    return;
+                }
+                numberItem.name = $"Number_{config.FieldName}";
+
+                var numberConfig = config as NumberGameSettingFieldConfig;
+                if (numberConfig == null)
+                {
+                    LogUtil.Error("GameSettingUIController: Config for field {0} is not NumberGameSettingFieldConfig", config.FieldName);
+                    return;
+                }
+
+                numberItem.SetConfig(numberConfig);
+
+                object currentValueObj = manager.GetValue(config.FieldName);
+                float initialValue = numberConfig.Default;
+                if (currentValueObj != null)
+                {
+                    try
+                    {
+                        initialValue = Convert.ToSingle(currentValueObj);
+                    }
+                    catch
+                    {
+                        initialValue = numberConfig.Default;
+                    }
+                }
+                numberItem.SetValue(initialValue);
+
+                numberItem.OnValueChanged += v =>
+                {
+                    manager.SetValue(config.FieldName, v);
+                };
+            }
+            else
+            {
+                LogUtil.Error("GameSettingUIController: Unsupported field type {0}", config.Type);
+            }
         }
 
         /// <summary>

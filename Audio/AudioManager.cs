@@ -32,6 +32,12 @@ namespace UnityCommonEx
         [Range(0f, 1f)]
         public float BGMVolume = 1f;
 
+        /// <summary>
+        /// SFX 音量（0-1）
+        /// </summary>
+        [Range(0f, 1f)]
+        public float SFXVolume = 1f;
+
         private DataTable<string, SFXConfigRow> sfxConfigTable;
         private DataTable<string, BGMConfigRow> bgmConfigTable;
 
@@ -128,6 +134,7 @@ namespace UnityCommonEx
 
             source.clip = clip;
             source.pitch = pitch;
+            source.volume = SFXVolume;
             source.gameObject.SetActive(true);
             source.Play();
 
@@ -228,6 +235,15 @@ namespace UnityCommonEx
             {
                 bgmSource.volume = BGMVolume;
             }
+        }
+
+        /// <summary>
+        /// 设置 SFX 音量
+        /// </summary>
+        /// <param name="volume">音量（0-1）</param>
+        public void SetSFXVolume(float volume)
+        {
+            SFXVolume = Mathf.Clamp01(volume);
         }
 
         /// <summary>

@@ -12,6 +12,11 @@ namespace UnityCommonEx
         /// 选项选择型字段（Select），配合 <c>Options</c> 使用
         /// </summary>
         Select = 0,
+
+        /// <summary>
+        /// 数值型字段（Number），配合 Min/Max/Step/Default 使用
+        /// </summary>
+        Number = 1,
     }
 
 }
