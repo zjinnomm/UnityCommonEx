@@ -244,6 +244,12 @@ namespace UnityCommonEx
         public void SetSFXVolume(float volume)
         {
             SFXVolume = Mathf.Clamp01(volume);
+            for (int i = 0; i < playingSources.Count; i++)
+            {
+                var src = playingSources[i].Source;
+                if (src != null && src.isPlaying)
+                    src.volume = SFXVolume;
+            }
         }
 
         /// <summary>
