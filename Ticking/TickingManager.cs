@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace UnityCommonEx
 {
@@ -56,6 +56,9 @@ namespace UnityCommonEx
 
         public static void Register(ITickable tickable)
         {
+            // 取消「下一帧开头」的待移除，否则：Unregister → 同帧/间隔内再 Register 时 HashSet 无变化，
+            // 下一 Tick 仍会把该项 Remove 掉，对象会永久不再被 Tick（如局外 UI 二次 OnActivate）。
+            toRemove.Remove(tickable);
             if (isTicking)
             {
                 // 如果正在 Tick，加入待添加列表
@@ -70,6 +73,8 @@ namespace UnityCommonEx
 
         public static void Unregister(ITickable tickable)
         {
+            // 取消尚未并入 tickables 的待添加，避免 Unregister 后仍被下一帧加入
+            toAdd.Remove(tickable);
             toRemove.Add(tickable);
         }
 
