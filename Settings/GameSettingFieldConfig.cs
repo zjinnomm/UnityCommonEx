@@ -9,6 +9,7 @@ namespace UnityCommonEx
     /// 通过 <see cref="GameSettingFieldType"/> + TypeReflected 机制，将不同字段类型
     /// 映射为不同的派生配置类，例如：
     /// - <see cref="SelectGameSettingFieldConfig"/> 对应 <see cref="GameSettingFieldType.Select"/>
+    /// - <see cref="ToggleGameSettingFieldConfig"/> 对应 <see cref="GameSettingFieldType.Toggle"/>
     /// </summary>
     [JsonConverter(typeof(TypeReflectableDataTemplateConverter<GameSettingFieldConfig, GameSettingFieldType>))]
     public abstract class GameSettingFieldConfig : TypeReflectableDataTemplate<GameSettingFieldConfig, GameSettingFieldType>
@@ -53,6 +54,7 @@ namespace UnityCommonEx
         {
             RegisterTypeReflection(typeof(SelectGameSettingFieldConfig), GameSettingFieldType.Select);
             RegisterTypeReflection(typeof(NumberGameSettingFieldConfig), GameSettingFieldType.Number);
+            RegisterTypeReflection(typeof(ToggleGameSettingFieldConfig), GameSettingFieldType.Toggle);
         }
 
     }
@@ -104,6 +106,18 @@ namespace UnityCommonEx
         /// </summary>
         [JsonProperty(Required = Required.Default)]
         public float Default = 100f;
+    }
+
+    /// <summary>
+    /// Toggle 类型字段的配置：用于布尔开关。
+    /// </summary>
+    public class ToggleGameSettingFieldConfig : GameSettingFieldConfig
+    {
+        /// <summary>
+        /// 默认值（默认 false）
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public bool Default = false;
     }
 
 }

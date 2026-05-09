@@ -36,6 +36,12 @@ namespace UnityCommonEx
         public GameObject NumberItemPrefab;
 
         /// <summary>
+        /// Toggle 类型字段的 UI 预制体：
+        /// - 根节点需挂载 <see cref="ToggleSettingItemUIController"/>（例如 <see cref="CapsuleSwitchToggleSettingItemUIController"/>）
+        /// </summary>
+        public GameObject ToggleItemPrefab;
+
+        /// <summary>
         /// 字段条目容器：所有 Label + SelectItem 都会实例化为其子节点
         /// </summary>
         [Header("UI容器")]
@@ -134,7 +140,7 @@ namespace UnityCommonEx
         }
 
         /// <summary>
-        /// 创建字段 UI（支持 Select / Number）
+        /// 创建字段 UI（支持 Select / Number / Toggle）
         /// </summary>
         private void CreateFieldUI(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
         {
@@ -264,6 +270,51 @@ namespace UnityCommonEx
                 numberItem.SetValue(initialValue);
 
                 numberItem.OnValueChanged += v =>
+                {
+                    manager.SetValue(config.FieldName, v);
+                };
+            }
+            else if (config.Type == GameSettingFieldType.Toggle)
+            {
+                if (ToggleItemPrefab == null)
+                {
+                    LogUtil.Error("GameSettingUIController: ToggleItemPrefab is not configured");
+                    return;
+                }
+
+                var toggleItem = NodeController.Create<ToggleSettingItemUIController>(ToggleItemPrefab, itemParent);
+                if (toggleItem == null)
+                {
+                    LogUtil.Error("GameSettingUIController: ToggleItemPrefab for field {0} does not have a ToggleSettingItemUIController", config.FieldName);
+                    return;
+                }
+                toggleItem.name = $"Toggle_{config.FieldName}";
+
+                var toggleConfig = config as ToggleGameSettingFieldConfig;
+                if (toggleConfig == null)
+                {
+                    LogUtil.Error("GameSettingUIController: Config for field {0} is not ToggleGameSettingFieldConfig", config.FieldName);
+                    return;
+                }
+
+                toggleItem.SetConfig(toggleConfig);
+
+                object currentValueObj = manager.GetValue(config.FieldName);
+                bool initialValue = toggleConfig.Default;
+                if (currentValueObj != null)
+                {
+                    try
+                    {
+                        initialValue = Convert.ToBoolean(currentValueObj);
+                    }
+                    catch
+                    {
+                        initialValue = toggleConfig.Default;
+                    }
+                }
+                toggleItem.SetValue(initialValue);
+
+                toggleItem.OnValueChanged += v =>
                 {
                     manager.SetValue(config.FieldName, v);
                 };
