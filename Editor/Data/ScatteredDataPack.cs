@@ -9,7 +9,7 @@ namespace UnityCommonEx
     public static class ScatteredDataPack
     {
 
-        public static void DataPack(string sourcePath, string targetPath)
+        public static string DataPack(string sourcePath, string targetPath)
         {
             var config = JsonUtil.Read<ScatteredDataLoadConfig>(sourcePath);
             config.Prepare();
@@ -21,11 +21,14 @@ namespace UnityCommonEx
                 File.Delete($"{filePath}.meta");
             }
 
+            Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+
             using (var fs = File.OpenWrite(filePath))
             {
                 config.Dump(fs);
             }
             AssetDatabase.Refresh();
+            return filePath;
         }
 
     }

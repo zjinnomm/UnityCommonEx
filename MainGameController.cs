@@ -18,6 +18,12 @@ namespace UnityCommonEx
         public string ScatteredDataLoadConfigPath;
         public string PackedDataPath;
 
+        [Header("Config")]
+        public DataLoadMethodType EditorConfigLoadMethod = DataLoadMethodType.ScatteredFile;
+        public DataLoadMethodType RuntimeConfigLoadMethod = DataLoadMethodType.PackedResourceFile;
+        public string ScatteredConfigPath;
+        public string PackedConfigPath;
+
         protected override bool IsPersistent => true;
 
         protected override void OnInit()
@@ -25,17 +31,30 @@ namespace UnityCommonEx
             base.OnInit();
             LogUtil.Init();
 
-            DataLoadMethodType loadMethod;
+            DataLoadMethodType dataLoadMethod;
+            DataLoadMethodType configLoadMethod;
 #if UNITY_EDITOR
-            loadMethod = EditorLoadMethod;
+            dataLoadMethod = EditorLoadMethod;
+            configLoadMethod = EditorConfigLoadMethod;
 #else
-            loadMethod = RuntimeLoadMethod;
+            dataLoadMethod = RuntimeLoadMethod;
+            configLoadMethod = RuntimeConfigLoadMethod;
 #endif
-            if (loadMethod == DataLoadMethodType.ScatteredFile)
+
+            if (configLoadMethod == DataLoadMethodType.ScatteredFile)
+            {
+                ConfigParser.ParseAllConfigs(ScatteredConfigPath);
+            }
+            else if (configLoadMethod == DataLoadMethodType.PackedResourceFile)
+            {
+                ConfigParser.ParsePackedConfigs(PackedConfigPath);
+            }
+
+            if (dataLoadMethod == DataLoadMethodType.ScatteredFile)
             {
                 DataManager.LoadScattered(ScatteredDataLoadConfigPath);
             }
-            else if (loadMethod == DataLoadMethodType.PackedResourceFile)
+            else if (dataLoadMethod == DataLoadMethodType.PackedResourceFile)
             {
                 DataManager.LoadPacked(PackedDataPath);
             }

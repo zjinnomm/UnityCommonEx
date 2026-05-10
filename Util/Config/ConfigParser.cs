@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using UnityEngine;
 
 namespace UnityCommonEx
@@ -38,7 +39,7 @@ namespace UnityCommonEx
         public static void ParseAllConfigs(string folderPath)
         {
             var processedSections = new HashSet<string>();
-            
+
             try
             {
                 if (!Directory.Exists(folderPath))
@@ -53,41 +54,7 @@ namespace UnityCommonEx
                 {
                     try
                     {
-                        var configData = IniFileParser.ParseFile(filePath);
-                        
-                        foreach (var section in configData)
-                        {
-                            string sectionName = section.Key;
-                            
-                            // Check if section has already been processed
-                            if (processedSections.Contains(sectionName))
-                            {
-                                LogUtil.Error($"section {sectionName} has already been processed from another file");
-                                continue;
-                            }
-                            
-                            processedSections.Add(sectionName);
-                            
-                            // Find the corresponding class by section name
-                            Type configClass = FindConfigClass(sectionName);
-                            if (configClass == null)
-                            {
-                                LogUtil.Error($"cannot find class for section {sectionName}");
-                                continue;
-                            }
-                            
-                            // Process each key-value pair in the section
-                            foreach (var kvp in section.Value)
-                            {
-                                string key = kvp.Key;
-                                string value = kvp.Value;
-                                
-                                if (!SetStaticFieldValue(configClass, key, value))
-                                {
-                                    LogUtil.Error($"failed to set static field {key} in class {configClass.Name} with value {value}");
-                                }
-                            }
-                        }
+                        ParseConfigData(IniFileParser.ParseFile(filePath), filePath, processedSections);
                     }
                     catch (Exception ex)
                     {
@@ -98,6 +65,75 @@ namespace UnityCommonEx
             catch (Exception ex)
             {
                 LogUtil.Error($"scanning folder error: {ex.Message}");
+            }
+        }
+
+        public static void ParsePackedConfigs(string resourcePath)
+        {
+            TextAsset data = Resources.Load<TextAsset>(resourcePath);
+            if (data == null)
+            {
+                LogUtil.Error("packed config resource not found: {0}", resourcePath);
+                return;
+            }
+
+            var processedSections = new HashSet<string>();
+
+            try
+            {
+                using (BinaryReader reader = new BinaryReader(new MemoryStream(data.bytes), Encoding.UTF8))
+                {
+                    while (reader.BaseStream.Position < reader.BaseStream.Length)
+                    {
+                        string entryPath = reader.ReadString();
+                        int length = reader.ReadInt32();
+                        string content = Encoding.UTF8.GetString(reader.ReadBytes(length));
+                        ParseConfigData(IniFileParser.ParseContent(content), entryPath, processedSections);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Error("parsing packed config resource {0} error: {1}", resourcePath, ex.Message);
+            }
+        }
+
+        private static void ParseConfigData(
+            Dictionary<string, Dictionary<string, string>> configData,
+            string sourceName,
+            HashSet<string> processedSections = null)
+        {
+            processedSections ??= new HashSet<string>();
+
+            foreach (var section in configData)
+            {
+                string sectionName = section.Key;
+
+                if (processedSections.Contains(sectionName))
+                {
+                    LogUtil.Error($"section {sectionName} has already been processed from another file");
+                    continue;
+                }
+
+                processedSections.Add(sectionName);
+
+                Type configClass = FindConfigClass(sectionName);
+                if (configClass == null)
+                {
+                    LogUtil.Error($"cannot find class for section {sectionName} from {sourceName}");
+                    continue;
+                }
+
+                foreach (var kvp in section.Value)
+                {
+                    string key = kvp.Key;
+                    string value = kvp.Value;
+
+                    if (!SetStaticFieldValue(configClass, key, value))
+                    {
+                        LogUtil.Error($"failed to set static field {key} in class {configClass.Name} with value {value} from {sourceName}");
+                    }
+                }
             }
         }
 

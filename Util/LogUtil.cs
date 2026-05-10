@@ -7,6 +7,7 @@ namespace UnityCommonEx
 
     public static class LogUtil
     {
+        static string logDirectory;
 
         public static void Info(string msg)
         {
@@ -43,19 +44,28 @@ namespace UnityCommonEx
         static FileStream stream;
         static StreamWriter writer;
 
-        public static void Init()
+        public static void Init(string directoryPath = null)
         {
-            if (!Directory.Exists("log"))
-                Directory.CreateDirectory("log");
-            stream = new FileStream($"log/{DateTime.Now.ToLocalTime():yyyy-MM-dd HH-mm-ss}.log", FileMode.OpenOrCreate);
+            logDirectory = string.IsNullOrEmpty(directoryPath)
+                ? Path.Combine(Application.persistentDataPath, "Logs")
+                : directoryPath;
+
+            if (!Directory.Exists(logDirectory))
+                Directory.CreateDirectory(logDirectory);
+
+            string logPath = Path.Combine(logDirectory, $"{DateTime.Now.ToLocalTime():yyyy-MM-dd HH-mm-ss}.log");
+            stream = new FileStream(logPath, FileMode.OpenOrCreate);
             writer = new StreamWriter(stream);
             Application.logMessageReceived += HandleLog;
         }
 
         public static void Release()
         {
-            writer.Close();
-            stream.Close();
+            Application.logMessageReceived -= HandleLog;
+            writer?.Close();
+            stream?.Close();
+            writer = null;
+            stream = null;
         }
 
         static void HandleLog(string logString, string stackTrace, LogType type)
