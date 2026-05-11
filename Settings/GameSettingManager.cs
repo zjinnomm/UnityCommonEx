@@ -6,59 +6,50 @@ using UnityEngine;
 namespace UnityCommonEx
 {
 
-    /// <summary>
-    /// 游戏设置管理器接口（非泛型版本，用于UI控制器）
-    /// </summary>
     public interface IGameSettingManager
     {
         object GetValue(string fieldName);
         void SetValue(string fieldName, object value);
     }
 
-    /// <summary>
-    /// 游戏设置管理器，负责设置的加载、保存和回调管理
-    /// </summary>
     public class GameSettingManager<T> : Singleton<GameSettingManager<T>>, IGameSettingManager where T : GameSetting, new()
     {
-
         private T _settings;
+        private T _committedSettings;
         private string _savePath;
-        private Dictionary<string, Action<object>> _callbacks = new Dictionary<string, Action<object>>();
-        private Dictionary<string, FieldInfo> _fieldCache = new Dictionary<string, FieldInfo>();
+        private readonly Dictionary<string, Action<object>> _callbacks = new Dictionary<string, Action<object>>();
+        private readonly HashSet<string> _immediateFields = new HashSet<string>();
+        private readonly Dictionary<string, FieldInfo> _fieldCache = new Dictionary<string, FieldInfo>();
 
-        /// <summary>
-        /// 当前设置实例
-        /// </summary>
         public T Settings => _settings;
+        public bool HasPendingChanges => !AreSettingsEqual(_settings, _committedSettings);
 
-        /// <summary>
-        /// 初始化管理器，指定保存路径
-        /// </summary>
-        /// <param name="savePath">设置保存路径（相对于项目根目录或绝对路径）</param>
         public void Initialize(string savePath)
         {
             _savePath = savePath;
             _settings = new T();
-            
-            // 缓存字段信息
+            _committedSettings = new T();
+
             CacheFields();
-            
-            // 自动加载设置
             Load();
         }
 
-        /// <summary>
-        /// 根据模板应用字段的 OnChangedFunc：注册变更回调，并在加载完成后对每个配置了 OnChangedFunc 的字段调用一次。
-        /// 应在 Initialize 之后、由持有 template 的调用方执行（如游戏入口或设置 UI 打开时）。
-        /// </summary>
         public void ApplyFieldCallbacks(GameSettingTemplate template)
         {
             if (template?.Fields == null)
                 return;
 
+            _immediateFields.Clear();
+
             foreach (var fieldConfig in template.Fields)
             {
-                if (fieldConfig?.OnChangedFunc == null || string.IsNullOrEmpty(fieldConfig.OnChangedFunc.Function))
+                if (fieldConfig == null)
+                    continue;
+
+                if (fieldConfig.ChangeImmediately)
+                    _immediateFields.Add(fieldConfig.FieldName);
+
+                if (fieldConfig.OnChangedFunc == null || string.IsNullOrEmpty(fieldConfig.OnChangedFunc.Function))
                     continue;
 
                 string fieldName = fieldConfig.FieldName;
@@ -78,37 +69,32 @@ namespace UnityCommonEx
             }
         }
 
-        /// <summary>
-        /// 缓存所有字段信息
-        /// </summary>
         private void CacheFields()
         {
             _fieldCache.Clear();
             Type type = typeof(T);
             FieldInfo[] fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-            
+
             foreach (FieldInfo field in fields)
             {
                 _fieldCache[field.Name] = field;
             }
         }
 
-        /// <summary>
-        /// 从文件加载设置
-        /// </summary>
         public void Load()
         {
             if (string.IsNullOrEmpty(_savePath))
             {
                 LogUtil.Warn("GameSettingManager: SavePath is not set, using default settings");
+                _settings = new T();
+                _committedSettings = CloneSettings(_settings);
                 return;
             }
 
             try
             {
-                // 构建完整路径
                 string fullPath = GetFullPath(_savePath);
-                
+
                 if (System.IO.File.Exists(fullPath))
                 {
                     _settings = JsonUtil.Read<T>(fullPath);
@@ -122,20 +108,19 @@ namespace UnityCommonEx
                 {
                     LogUtil.Info("GameSettingManager: Settings file not found, using default settings");
                     _settings = new T();
-                    // 保存默认设置
                     Save();
                 }
+
+                _committedSettings = CloneSettings(_settings);
             }
             catch (Exception ex)
             {
                 LogUtil.Error("GameSettingManager: Error loading settings: {0}", ex.Message);
                 _settings = new T();
+                _committedSettings = CloneSettings(_settings);
             }
         }
 
-        /// <summary>
-        /// 保存设置到文件
-        /// </summary>
         public void Save()
         {
             if (string.IsNullOrEmpty(_savePath))
@@ -148,6 +133,7 @@ namespace UnityCommonEx
             {
                 string fullPath = GetFullPath(_savePath);
                 JsonUtil.Write(fullPath, _settings);
+                _committedSettings = CloneSettings(_settings);
             }
             catch (Exception ex)
             {
@@ -155,19 +141,56 @@ namespace UnityCommonEx
             }
         }
 
-        /// <summary>
-        /// 获取完整路径（支持相对路径和绝对路径）
-        /// </summary>
+        public void ApplyChanges()
+        {
+            try
+            {
+                foreach (var kv in _fieldCache)
+                {
+                    object currentValue = kv.Value.GetValue(_settings);
+                    object committedValue = _committedSettings != null ? kv.Value.GetValue(_committedSettings) : null;
+                    if (ValuesEqual(currentValue, committedValue))
+                        continue;
+
+                    if (_immediateFields.Contains(kv.Key))
+                        continue;
+
+                    if (_callbacks.TryGetValue(kv.Key, out Action<object> callback))
+                        callback?.Invoke(currentValue);
+                }
+
+                Save();
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Error("GameSettingManager: Error applying settings: {0}", ex.Message);
+            }
+        }
+
+        public void RevertChanges()
+        {
+            foreach (var fieldName in _immediateFields)
+            {
+                if (!_fieldCache.TryGetValue(fieldName, out FieldInfo field))
+                    continue;
+
+                object currentValue = field.GetValue(_settings);
+                object committedValue = _committedSettings != null ? field.GetValue(_committedSettings) : null;
+                if (ValuesEqual(currentValue, committedValue))
+                    continue;
+
+                if (_callbacks.TryGetValue(fieldName, out Action<object> callback))
+                    callback?.Invoke(committedValue);
+            }
+
+            _settings = CloneSettings(_committedSettings ?? new T());
+        }
+
         private string GetFullPath(string path)
         {
             return path;
         }
 
-        /// <summary>
-        /// 注册字段修改回调
-        /// </summary>
-        /// <param name="fieldName">字段名</param>
-        /// <param name="callback">回调函数</param>
         public void RegisterCallback(string fieldName, Action<object> callback)
         {
             if (string.IsNullOrEmpty(fieldName))
@@ -192,11 +215,6 @@ namespace UnityCommonEx
             }
         }
 
-        /// <summary>
-        /// 设置字段值（会触发保存和回调）
-        /// </summary>
-        /// <param name="fieldName">字段名</param>
-        /// <param name="value">新值</param>
         public void SetValue(string fieldName, object value)
         {
             if (string.IsNullOrEmpty(fieldName))
@@ -213,20 +231,15 @@ namespace UnityCommonEx
 
             try
             {
-                // 类型转换
+                object currentValue = field.GetValue(_settings);
                 object convertedValue = ConvertValue(value, field.FieldType);
-                
-                // 设置值
+                if (ValuesEqual(currentValue, convertedValue))
+                    return;
+
                 field.SetValue(_settings, convertedValue);
-                
-                // 触发回调
-                if (_callbacks.TryGetValue(fieldName, out Action<object> callback))
-                {
+
+                if (_immediateFields.Contains(fieldName) && _callbacks.TryGetValue(fieldName, out Action<object> callback))
                     callback?.Invoke(convertedValue);
-                }
-                
-                // 自动保存
-                Save();
             }
             catch (Exception ex)
             {
@@ -234,11 +247,6 @@ namespace UnityCommonEx
             }
         }
 
-        /// <summary>
-        /// 获取字段值
-        /// </summary>
-        /// <param name="fieldName">字段名</param>
-        /// <returns>字段值</returns>
         public object GetValue(string fieldName)
         {
             if (string.IsNullOrEmpty(fieldName))
@@ -264,45 +272,52 @@ namespace UnityCommonEx
             }
         }
 
-        /// <summary>
-        /// 类型转换辅助方法
-        /// </summary>
         private object ConvertValue(object value, Type targetType)
         {
             if (value == null)
-            {
                 return targetType.IsValueType ? Activator.CreateInstance(targetType) : null;
-            }
 
             Type valueType = value.GetType();
-            
-            // 如果类型匹配，直接返回
             if (targetType.IsAssignableFrom(valueType))
-            {
                 return value;
-            }
 
-            // 处理可空类型
             Type underlyingType = Nullable.GetUnderlyingType(targetType);
             if (underlyingType != null)
-            {
                 targetType = underlyingType;
-            }
 
-            // 尝试转换
             if (targetType.IsEnum)
             {
                 if (value is string strValue)
-                {
                     return Enum.Parse(targetType, strValue);
-                }
                 return Enum.ToObject(targetType, value);
             }
 
-            // 基本类型转换
             return Convert.ChangeType(value, targetType);
         }
 
-    }
+        private static bool ValuesEqual(object left, object right)
+        {
+            if (left == null && right == null)
+                return true;
+            if (left == null || right == null)
+                return false;
+            return Equals(left, right);
+        }
 
+        private static bool AreSettingsEqual(T left, T right)
+        {
+            if (left == null && right == null)
+                return true;
+            if (left == null || right == null)
+                return false;
+            return JsonUtil.WriteRaw(left) == JsonUtil.WriteRaw(right);
+        }
+
+        private static T CloneSettings(T source)
+        {
+            if (source == null)
+                return new T();
+            return JsonUtil.ReadRaw<T>(JsonUtil.WriteRaw(source));
+        }
+    }
 }

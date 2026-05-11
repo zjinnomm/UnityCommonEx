@@ -48,6 +48,13 @@ namespace UnityCommonEx
         public CachedStaticMethodRef OnChangedFunc;
 
         /// <summary>
+        /// 是否在 UI 调整时立即生效，但延迟到 Apply 才保存。
+        /// Revert 时会回滚到已提交值并重新调用回调。
+        /// </summary>
+        [JsonProperty(Required = Required.Default)]
+        public bool ChangeImmediately = false;
+
+        /// <summary>
         /// 注册各字段类型与派生配置类的映射关系。
         /// </summary>
         public static void RegisterTypeReflections()
