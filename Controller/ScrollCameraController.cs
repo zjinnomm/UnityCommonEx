@@ -15,6 +15,8 @@ namespace UnityCommonEx
         readonly RangeAttribute sizeRange = new RangeAttribute(MinSize, MaxSize);
         bool locked = true;
         Rect posRange;
+        Vector2 lastMouseViewportPos;
+        bool hasLastMouseViewportPos;
 
         protected override void OnInit()
         {
@@ -43,16 +45,24 @@ namespace UnityCommonEx
         {
             if (locked)
             {
+                hasLastMouseViewportPos = false;
                 return;
             }
-            targetCamera.orthographicSize = Mathf.Clamp(targetCamera.orthographicSize + InteractionModel.ScrollDelta, sizeRange.min, sizeRange.max);
-            if (InteractionModel.IsPressed)
+            float scrollDelta = Input.mouseScrollDelta.y;
+            targetCamera.orthographicSize = Mathf.Clamp(targetCamera.orthographicSize + scrollDelta, sizeRange.min, sizeRange.max);
+
+            Vector2 currentMouseViewportPos = InteractionModel.GetMouseNormalizedPos();
+            if (Input.GetMouseButton(0))
             {
+                Vector2 viewportDelta = hasLastMouseViewportPos ? currentMouseViewportPos - lastMouseViewportPos : Vector2.zero;
                 Vector2 pos = gameObject.transform.localPosition;
-                Vector2 deltaPos = InteractionModel.Delta * targetCamera.orthographicSize * 2 / targetCamera.pixelHeight;
+                Vector2 deltaPos = viewportDelta * targetCamera.orthographicSize * 2 / targetCamera.pixelHeight;
                 pos -= deltaPos;
                 gameObject.transform.localPosition = new Vector3(Mathf.Clamp(pos.x, posRange.xMin, posRange.xMax), Mathf.Clamp(pos.y, posRange.yMin, posRange.yMax), CameraZ);
             }
+
+            lastMouseViewportPos = currentMouseViewportPos;
+            hasLastMouseViewportPos = true;
         }
 
     }

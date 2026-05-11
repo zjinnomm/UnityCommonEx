@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using UnityEngine;
 
 namespace UnityCommonEx
 {
@@ -16,7 +17,8 @@ namespace UnityCommonEx
 
         public override void OnUpdate(float delta, ref TutorialManager.ActivatedEntry record)
         {
-            if (InteractionModel.IsPressed && GetRegion(record.RectOverride).Contains(InteractionModel.Pos))
+            if (Input.GetMouseButton(0) &&
+                GetRegion(record.RectOverride).Contains(InteractionModel.GetMouseNormalizedPos()))
             {
                 if (DeactivatePrevious)
                 {
