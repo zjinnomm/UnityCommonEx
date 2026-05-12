@@ -17,6 +17,7 @@ namespace UnityCommonEx
         private readonly Dictionary<TAction, List<InputBinding>> bindingsByAction = new Dictionary<TAction, List<InputBinding>>();
         private readonly Dictionary<TAction, List<InputBinding>> triggeredBindingsByAction = new Dictionary<TAction, List<InputBinding>>();
         private readonly Dictionary<TAction, List<ActionListener>> listenersByAction = new Dictionary<TAction, List<ActionListener>>();
+        private readonly Dictionary<TAction, List<IInputActionWrapper<TAction>>> wrappersByAction = new Dictionary<TAction, List<IInputActionWrapper<TAction>>>();
         private readonly HashSet<TAction> triggeredActions = new HashSet<TAction>();
         private readonly List<TAction> actionScratch = new List<TAction>();
         private bool initialized;
@@ -101,6 +102,8 @@ namespace UnityCommonEx
                     continue;
 
                 triggeredActions.Add(action);
+                if (TryTriggerTopWrapper(action))
+                    continue;
                 NotifyListeners(action);
             }
         }
@@ -171,6 +174,43 @@ namespace UnityCommonEx
             });
         }
 
+        public void RegisterWrapper(IInputActionWrapper<TAction> wrapper)
+        {
+            if (wrapper == null)
+                return;
+
+            TAction action = wrapper.Action;
+            if (!wrappersByAction.TryGetValue(action, out var wrappers))
+            {
+                wrappers = new List<IInputActionWrapper<TAction>>();
+                wrappersByAction[action] = wrappers;
+            }
+
+            for (int i = 0; i < wrappers.Count; i++)
+            {
+                if (ReferenceEquals(wrappers[i], wrapper))
+                    return;
+            }
+
+            wrappers.Add(wrapper);
+        }
+
+        public void UnregisterWrapper(IInputActionWrapper<TAction> wrapper)
+        {
+            if (wrapper == null)
+                return;
+
+            TAction action = wrapper.Action;
+            if (!wrappersByAction.TryGetValue(action, out var wrappers))
+                return;
+
+            for (int i = wrappers.Count - 1; i >= 0; i--)
+            {
+                if (ReferenceEquals(wrappers[i], wrapper))
+                    wrappers.RemoveAt(i);
+            }
+        }
+
         public void UnregisterListener(TAction action, object owner)
         {
             if (!listenersByAction.TryGetValue(action, out var listeners))
@@ -226,6 +266,30 @@ namespace UnityCommonEx
 
                 listener.Callback(action);
             }
+        }
+
+        private bool TryTriggerTopWrapper(TAction action)
+        {
+            if (!wrappersByAction.TryGetValue(action, out var wrappers) || wrappers == null || wrappers.Count == 0)
+                return false;
+
+            for (int i = wrappers.Count - 1; i >= 0; i--)
+            {
+                IInputActionWrapper<TAction> wrapper = wrappers[i];
+                if (wrapper == null || IsDeadUnityObject(wrapper))
+                {
+                    wrappers.RemoveAt(i);
+                    continue;
+                }
+
+                if (!wrapper.CanTrigger())
+                    continue;
+
+                wrapper.Trigger();
+                return true;
+            }
+
+            return false;
         }
 
         private static bool IsDeadUnityObject(object owner)
