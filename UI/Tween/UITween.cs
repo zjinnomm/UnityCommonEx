@@ -11,6 +11,7 @@ namespace UnityCommonEx
         public float Alpha;
         public float SizeX;
         public float SizeY;
+        public float Scale;
     }
 
     public class UITween : IPoolable
@@ -69,6 +70,10 @@ namespace UnityCommonEx
                     sizeDelta.y = state.SizeY;
                 }
                 TargetTransform.sizeDelta = sizeDelta;
+                if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
+                {
+                    TargetTransform.localScale = new Vector3(state.Scale, state.Scale, state.Scale);
+                }
             }
         }
 
@@ -97,6 +102,11 @@ namespace UnityCommonEx
                 StartState.SizeY = Config.MinSizeY;
                 TargetState.SizeY = Config.MaxSizeY;
             }
+            if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
+            {
+                StartState.Scale = Config.MinScale;
+                TargetState.Scale = Config.MaxScale;
+            }
             
             // 第一次 Tick 前，通过曲线初端（t=0）设置初始状态
             ApplyInitialState();
@@ -112,6 +122,7 @@ namespace UnityCommonEx
                 initialState.Position = TargetTransform.anchoredPosition;
                 initialState.SizeX = TargetTransform.sizeDelta.x;
                 initialState.SizeY = TargetTransform.sizeDelta.y;
+                initialState.Scale = TargetTransform.localScale.x;
             }
             if (GetTargetAlphaFunc != null)
             {
@@ -163,6 +174,16 @@ namespace UnityCommonEx
                     sizeY = Mathf.Lerp(Config.MinSizeY, Config.MaxSizeY, curveValue);
                 }
                 initialState.SizeY = sizeY;
+            }
+            if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
+            {
+                float scale = Config.MinScale;
+                if (Config.ScaleCurve != null && Config.ScaleCurve.length > 0)
+                {
+                    float curveValue = Config.ScaleCurve.Evaluate(0f);
+                    scale = Mathf.Lerp(Config.MinScale, Config.MaxScale, curveValue);
+                }
+                initialState.Scale = scale;
             }
             
             ApplyState(initialState);
@@ -222,6 +243,7 @@ namespace UnityCommonEx
                 finalState.Position = TargetTransform.anchoredPosition;
                 finalState.SizeX = TargetTransform.sizeDelta.x;
                 finalState.SizeY = TargetTransform.sizeDelta.y;
+                finalState.Scale = TargetTransform.localScale.x;
             }
             if (GetTargetAlphaFunc != null)
             {
@@ -273,6 +295,16 @@ namespace UnityCommonEx
                     sizeY = Mathf.Lerp(Config.MinSizeY, Config.MaxSizeY, curveValue);
                 }
                 finalState.SizeY = sizeY;
+            }
+            if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
+            {
+                float scale = Config.MaxScale;
+                if (Config.ScaleCurve != null && Config.ScaleCurve.length > 0)
+                {
+                    float curveValue = Config.ScaleCurve.Evaluate(1f);
+                    scale = Mathf.Lerp(Config.MinScale, Config.MaxScale, curveValue);
+                }
+                finalState.Scale = scale;
             }
             
             ApplyState(finalState);
@@ -346,6 +378,18 @@ namespace UnityCommonEx
                 else
                 {
                     state.SizeY = Mathf.Lerp(StartState.SizeY, TargetState.SizeY, normalizedT);
+                }
+            }
+            if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
+            {
+                if (Config.ScaleCurve != null && Config.ScaleCurve.length > 0)
+                {
+                    float curveValue = Config.ScaleCurve.Evaluate(normalizedT);
+                    state.Scale = Mathf.Lerp(StartState.Scale, TargetState.Scale, curveValue);
+                }
+                else
+                {
+                    state.Scale = Mathf.Lerp(StartState.Scale, TargetState.Scale, normalizedT);
                 }
             }
             

@@ -65,6 +65,15 @@ namespace UnityCommonEx
                 EditorGUI.PropertyField(position, property.FindPropertyRelative("SizeYCurve"));
                 position.y += UnitPropHeight + UnitPropMargin;
             }
+            if ((propType.enumValueFlag & (byte)UITweenPropType.Scale) > 0)
+            {
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("MinScale"));
+                position.y += UnitPropHeight + UnitPropMargin;
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("MaxScale"));
+                position.y += UnitPropHeight + UnitPropMargin;
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("ScaleCurve"));
+                position.y += UnitPropHeight + UnitPropMargin;
+            }
             
             EditorGUIUtility.labelWidth = labelWidth;
             EditorGUI.EndProperty();
@@ -90,10 +99,13 @@ namespace UnityCommonEx
             {
                 prop += 3; // MinSizeY, MaxSizeY, SizeYCurve
             }
+            if ((propType & (byte)UITweenPropType.Scale) > 0)
+            {
+                prop += 3; // MinScale, MaxScale, ScaleCurve
+            }
             return prop * (UnitPropHeight + UnitPropMargin) - UnitPropMargin;
         }
 
     }
 
 }
-

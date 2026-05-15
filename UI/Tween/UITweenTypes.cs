@@ -9,7 +9,8 @@ namespace UnityCommonEx
         Position = 0b1,
         Alpha = 0b10,
         SizeX = 0b100,
-        SizeY = 0b1000
+        SizeY = 0b1000,
+        Scale = 0b10000
     }
 
     [Serializable]
@@ -42,6 +43,11 @@ namespace UnityCommonEx
         public float MinSizeY;      // 曲线计算的起始值（t=0）
         public float MaxSizeY;      // 曲线计算的结束值（t=1）
         public AnimationCurve SizeYCurve;  // 时间范围 0-1（相对于 Duration）
+
+        // Scale properties
+        public float MinScale;      // 曲线计算的起始值（t=0），统一作用于 XYZ
+        public float MaxScale;      // 曲线计算的结束值（t=1），统一作用于 XYZ
+        public AnimationCurve ScaleCurve;  // 时间范围 0-1（相对于 Duration），统一作用于 XYZ
     }
 
     public struct UITweenObject
