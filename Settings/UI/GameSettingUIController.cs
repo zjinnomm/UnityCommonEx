@@ -1,83 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
+using UnityEngine.Serialization;
 
 namespace UnityCommonEx
 {
-
-    /// <summary>
-    /// 游戏设置UI控制器，根据模板自动生成分页UI
-    /// </summary>
     public class GameSettingUIController : SingletonController<GameSettingUIController>
     {
-
-        /// <summary>
-        /// 单条设置项容器预制体：
-        /// - 根节点挂载 <see cref="SettingEntryItemUIController"/>
-        /// - 负责在一行内水平布局 Label 与具体 SettingItem 控件
-        /// </summary>
-        [Header("UI预制体引用")]
+        [Header("UI Prefabs")]
         public GameObject SettingEntryItemPrefab;
-
-        /// <summary>
-        /// Select 类型字段的 UI 预制体：
-        /// - 根节点需挂载 <see cref="SelectSettingItemUIController"/>（例如 <see cref="SpinnerSelectSettingItemUIController"/>）
-        /// - 具体视觉和交互逻辑由该 Controller 实现
-        /// </summary>
         public GameObject SelectItemPrefab;
-
-        /// <summary>
-        /// Number 类型字段的 UI 预制体：
-        /// - 根节点需挂载 <see cref="NumberSettingItemUIController"/>（例如 <see cref="SliderNumberSettingItemUIController"/>）
-        /// </summary>
         public GameObject NumberItemPrefab;
-
-        /// <summary>
-        /// Toggle 类型字段的 UI 预制体：
-        /// - 根节点需挂载 <see cref="ToggleSettingItemUIController"/>（例如 <see cref="CapsuleSwitchToggleSettingItemUIController"/>）
-        /// </summary>
         public GameObject ToggleItemPrefab;
+        public GameObject GroupHeaderPrefab;
 
-        /// <summary>
-        /// 字段条目容器：所有 Label + SelectItem 都会实例化为其子节点
-        /// </summary>
-        [Header("UI容器")]
+        [Header("UI Roots")]
         public Transform EntryRoot;
 
-        /// <summary>
-        /// Tab 容器（可选）：如果配置，则按 Group 生成 Tab，并通过点击 Tab 切换 EntryRoot 的内容。
-        /// 如果不配置 TabRoot，则所有字段按顺序直接平铺在 EntryRoot 下。
-        /// </summary>
-        public Transform TabRoot;
+        [FormerlySerializedAs("TabRoot")]
+        public Transform CategoryTabRoot;
 
-        /// <summary>
-        /// Tab 预制体（可选）：
-        /// - 根节点：带 RectTransform
-        /// - 挂载 Button（用于点击切换 Group）
-        /// - 挂载 TMP_Text 或 Text（用于显示 GroupName 或本地化后的标题）
-        /// </summary>
-        public GameObject TabPrefab;
+        [FormerlySerializedAs("TabPrefab")]
+        public GameObject CategoryTabPrefab;
 
-        // 内部数据
-        private GameSettingTemplate _currentTemplate;
-        private IGameSettingManager _currentManager;
-        private readonly Dictionary<string, GameObject> _tabs = new Dictionary<string, GameObject>();
+        private GameSettingTemplate currentTemplate;
+        private IGameSettingManager currentManager;
+        private readonly Dictionary<string, CommonSelectableListItemUIController> categoryTabs =
+            new Dictionary<string, CommonSelectableListItemUIController>();
 
-        /// <summary>
-        /// 当前是否已根据模板生成过 UI（用于语言切换后判断是否需要重载）
-        /// </summary>
-        public bool IsGenerated => _currentTemplate != null;
+        public bool IsGenerated => currentTemplate != null;
 
-        /// <summary>
-        /// 根据模板生成UI
-        /// </summary>
-        /// <typeparam name="T">设置类型</typeparam>
-        /// <param name="template">设置模板</param>
-        /// <param name="manager">设置管理器</param>
-        public void GenerateUI<T>(GameSettingTemplate template, GameSettingManager<T> manager) where T : GameSetting, new()
+        public void GenerateUI<T>(GameSettingTemplate template, GameSettingManager<T> manager)
+            where T : GameSetting, new()
         {
             if (template == null || manager == null)
             {
@@ -85,16 +40,16 @@ namespace UnityCommonEx
                 return;
             }
 
-            if (template.Fields == null || template.Fields.Length == 0)
+            List<GameSettingCategoryConfig> categories = template.EnumerateCategories().ToList();
+            if (categories.Count == 0)
             {
-                LogUtil.Warn("GameSettingUIController: Template has no fields");
+                LogUtil.Warn("GameSettingUIController: Template has no categories");
                 return;
             }
 
-            _currentTemplate = template;
-            _currentManager = manager;
+            currentTemplate = template;
+            currentManager = manager;
 
-            // 清理现有UI与 Tabs
             ClearUI();
             ClearTabs();
 
@@ -104,44 +59,126 @@ namespace UnityCommonEx
                 return;
             }
 
-            // 分组排序
-            var grouped = template.Fields
-                .GroupBy(f => f.GroupName)
-                .OrderBy(g => g.First().GroupOrder)
-                .ThenBy(g => g.Key)
-                .ToList();
-
-            // 如果配置了 TabRoot + TabPrefab，则按 Group 创建 Tab，并通过 Tab 切换内容
-            if (TabRoot != null && TabPrefab != null)
+            if (CategoryTabRoot != null && CategoryTabPrefab != null)
             {
-                foreach (var group in grouped)
-                {
-                    string groupName = group.Key;
-                    CreateTab(groupName);
-                }
+                for (int i = 0; i < categories.Count; i++)
+                    CreateCategoryTab(categories[i]);
 
-                // 默认显示第一个分组
-                if (grouped.Count > 0)
-                {
-                    ShowGroup(grouped[0].Key);
-                }
+                ShowCategory(categories[0].CategoryName);
+                return;
             }
-            else
-            {
-                // 未配置 Tab，则所有字段直接平铺在 EntryRoot 下
-                var orderedFields = grouped
-                    .SelectMany(g => g.OrderBy(f => f.FieldOrder));
 
-                foreach (var fieldConfig in orderedFields)
+            for (int i = 0; i < categories.Count; i++)
+                CreateCategoryContent(categories[i], EntryRoot, manager);
+        }
+
+        private void ShowCategory(string categoryName)
+        {
+            if (currentTemplate == null || currentManager == null)
+            {
+                LogUtil.Error("GameSettingUIController: ShowCategory called before GenerateUI");
+                return;
+            }
+
+            GameSettingCategoryConfig category = currentTemplate
+                .EnumerateCategories()
+                .FirstOrDefault(item => item != null && item.CategoryName == categoryName);
+            if (category == null)
+            {
+                LogUtil.Warn("GameSettingUIController: Category '{0}' not found", categoryName);
+                return;
+            }
+
+            ClearUI();
+            CreateCategoryContent(category, EntryRoot, currentManager);
+            RefreshTabSelection(categoryName);
+        }
+
+        private void CreateCategoryContent(
+            GameSettingCategoryConfig category,
+            Transform parent,
+            IGameSettingManager manager)
+        {
+            if (category == null || parent == null || manager == null)
+                return;
+
+            if (category.Groups == null)
+                return;
+
+            for (int i = 0; i < category.Groups.Length; i++)
+            {
+                GameSettingGroupConfig group = category.Groups[i];
+                if (group == null)
+                    continue;
+
+                CreateGroupHeader(group, parent);
+
+                if (group.Fields == null)
+                    continue;
+
+                for (int j = 0; j < group.Fields.Length; j++)
                 {
-                    CreateFieldUI(fieldConfig, EntryRoot, manager as IGameSettingManager);
+                    GameSettingFieldConfig fieldConfig = group.Fields[j];
+                    if (fieldConfig == null)
+                        continue;
+
+                    CreateFieldUI(fieldConfig, parent, manager);
                 }
             }
         }
 
-        /// <summary>
-        /// 创建字段 UI（支持 Select / Number / Toggle）
-        /// </summary>
+        private void CreateGroupHeader(GameSettingGroupConfig group, Transform parent)
+        {
+            if (GroupHeaderPrefab == null || group == null || parent == null)
+                return;
+
+            SettingGroupHeaderUIController header =
+                NodeController.Create<SettingGroupHeaderUIController>(GroupHeaderPrefab, parent);
+            if (header == null)
+            {
+                LogUtil.Error("GameSettingUIController: GroupHeaderPrefab does not have SettingGroupHeaderUIController");
+                return;
+            }
+
+            header.name = "Group_" + group.GroupName;
+            header.SetLabel(GetDisplayText(group.DisplayName, group.GroupName));
+        }
+
+        private void CreateCategoryTab(GameSettingCategoryConfig category)
+        {
+            if (CategoryTabRoot == null || CategoryTabPrefab == null || category == null)
+                return;
+
+            CommonSelectableListItemUIController tab =
+                NodeController.Create<CommonSelectableListItemUIController>(CategoryTabPrefab, CategoryTabRoot);
+            if (tab == null)
+            {
+                LogUtil.Error("GameSettingUIController: CategoryTabPrefab does not have CommonSelectableListItemUIController");
+                return;
+            }
+
+            tab.name = "Tab_" + category.CategoryName;
+            tab.SetItem(GetDisplayText(category.DisplayName, category.CategoryName));
+            tab.OnDeselected();
+            if (tab.InteractiveButton != null)
+                tab.InteractiveButton.onClick.AddListener(() => ShowCategory(category.CategoryName));
+            categoryTabs[category.CategoryName] = tab;
+        }
+
+        private void RefreshTabSelection(string selectedCategoryName)
+        {
+            foreach (KeyValuePair<string, CommonSelectableListItemUIController> kv in categoryTabs)
+            {
+                if (kv.Value == null)
+                    continue;
+
+                if (kv.Key == selectedCategoryName)
+                    kv.Value.OnSelected();
+                else
+                    kv.Value.OnDeselected();
+            }
+        }
+
         private void CreateFieldUI(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
         {
             if (SettingEntryItemPrefab == null)
@@ -150,311 +187,237 @@ namespace UnityCommonEx
                 return;
             }
 
-            // 1. 创建整行 Entry 容器
-            var entry = NodeController.Create<SettingEntryItemUIController>(SettingEntryItemPrefab, parent);
+            SettingEntryItemUIController entry =
+                NodeController.Create<SettingEntryItemUIController>(SettingEntryItemPrefab, parent);
             if (entry == null)
             {
                 LogUtil.Error("GameSettingUIController: SettingEntryItemPrefab does not have SettingEntryItemUIController");
                 return;
             }
-            entry.name = $"Entry_{config.FieldName}";
-            entry.SetLabel(config.DisplayName != null ? config.DisplayName.GetText() : config.FieldName);
 
-            var itemParent = entry.GetSettingItemRoot();
+            entry.name = "Entry_" + config.FieldName;
+            entry.SetLabel(GetDisplayText(config.DisplayName, config.FieldName));
+
+            Transform itemParent = entry.GetSettingItemRoot();
 
             if (config.Type == GameSettingFieldType.Select)
             {
-                if (SelectItemPrefab == null)
-                {
-                    LogUtil.Error("GameSettingUIController: SelectItemPrefab is not configured");
-                    return;
-                }
-
-                // 2. 创建 Select 控件到 Entry 的 SettingItemRoot 下
-                var selectItem = NodeController.Create<SelectSettingItemUIController>(SelectItemPrefab, itemParent);
-                if (selectItem == null)
-                {
-                    LogUtil.Error("GameSettingUIController: SelectItemPrefab for field {0} does not have a SelectSettingItemUIController", config.FieldName);
-                    return;
-                }
-                selectItem.name = $"Select_{config.FieldName}";
-
-                // 配置选项
-                var selectConfig = config as SelectGameSettingFieldConfig;
-                if (selectConfig == null)
-                {
-                    LogUtil.Error("GameSettingUIController: Config for field {0} is not SelectGameSettingFieldConfig", config.FieldName);
-                    return;
-                }
-
-                var options = selectConfig.Options ?? Array.Empty<string>();
-                string[] displayTexts = options;
-                if (selectConfig.DisplayOptions != null && selectConfig.DisplayOptions.Length == options.Length)
-                {
-                    displayTexts = new string[options.Length];
-                    for (int i = 0; i < options.Length; i++)
-                    {
-                        displayTexts[i] = selectConfig.DisplayOptions[i]?.GetText() ?? options[i];
-                    }
-                }
-                selectItem.SetOptions(displayTexts);
-
-                // 根据当前 GameSetting 值计算初始索引
-                int initialIndex = 0;
-                if (options.Length > 0)
-                {
-                    object currentValue = manager.GetValue(config.FieldName);
-                    if (currentValue != null)
-                    {
-                        string currentStr = Convert.ToString(currentValue);
-                        int found = Array.IndexOf(options, currentStr);
-                        if (found >= 0)
-                        {
-                            initialIndex = found;
-                        }
-                    }
-                }
-                selectItem.SetSelectedIndex(initialIndex);
-
-                // 3. 订阅变更事件，写回 GameSetting
-                selectItem.OnSelectedIndexChanged += index =>
-                {
-                    if (index < 0 || index >= options.Length)
-                    {
-                        return;
-                    }
-
-                    string selectedStr = options[index];
-                    // 直接写入字符串，底层 GameSettingManager 会根据字段类型做 Convert.ChangeType
-                    manager.SetValue(config.FieldName, selectedStr);
-                };
+                CreateSelectField(config, itemParent, manager);
+                return;
             }
-            else if (config.Type == GameSettingFieldType.Number)
+
+            if (config.Type == GameSettingFieldType.Number)
             {
-                if (NumberItemPrefab == null)
-                {
-                    LogUtil.Error("GameSettingUIController: NumberItemPrefab is not configured");
-                    return;
-                }
-
-                var numberItem = NodeController.Create<NumberSettingItemUIController>(NumberItemPrefab, itemParent);
-                if (numberItem == null)
-                {
-                    LogUtil.Error("GameSettingUIController: NumberItemPrefab for field {0} does not have a NumberSettingItemUIController", config.FieldName);
-                    return;
-                }
-                numberItem.name = $"Number_{config.FieldName}";
-
-                var numberConfig = config as NumberGameSettingFieldConfig;
-                if (numberConfig == null)
-                {
-                    LogUtil.Error("GameSettingUIController: Config for field {0} is not NumberGameSettingFieldConfig", config.FieldName);
-                    return;
-                }
-
-                numberItem.SetConfig(numberConfig);
-
-                object currentValueObj = manager.GetValue(config.FieldName);
-                float initialValue = numberConfig.Default;
-                if (currentValueObj != null)
-                {
-                    try
-                    {
-                        initialValue = Convert.ToSingle(currentValueObj);
-                    }
-                    catch
-                    {
-                        initialValue = numberConfig.Default;
-                    }
-                }
-                numberItem.SetValue(initialValue);
-
-                numberItem.OnValueChanged += v =>
-                {
-                    manager.SetValue(config.FieldName, v);
-                };
+                CreateNumberField(config, itemParent, manager);
+                return;
             }
-            else if (config.Type == GameSettingFieldType.Toggle)
+
+            if (config.Type == GameSettingFieldType.Toggle)
             {
-                if (ToggleItemPrefab == null)
-                {
-                    LogUtil.Error("GameSettingUIController: ToggleItemPrefab is not configured");
-                    return;
-                }
-
-                var toggleItem = NodeController.Create<ToggleSettingItemUIController>(ToggleItemPrefab, itemParent);
-                if (toggleItem == null)
-                {
-                    LogUtil.Error("GameSettingUIController: ToggleItemPrefab for field {0} does not have a ToggleSettingItemUIController", config.FieldName);
-                    return;
-                }
-                toggleItem.name = $"Toggle_{config.FieldName}";
-
-                var toggleConfig = config as ToggleGameSettingFieldConfig;
-                if (toggleConfig == null)
-                {
-                    LogUtil.Error("GameSettingUIController: Config for field {0} is not ToggleGameSettingFieldConfig", config.FieldName);
-                    return;
-                }
-
-                toggleItem.SetConfig(toggleConfig);
-
-                object currentValueObj = manager.GetValue(config.FieldName);
-                bool initialValue = toggleConfig.Default;
-                if (currentValueObj != null)
-                {
-                    try
-                    {
-                        initialValue = Convert.ToBoolean(currentValueObj);
-                    }
-                    catch
-                    {
-                        initialValue = toggleConfig.Default;
-                    }
-                }
-                toggleItem.SetValue(initialValue);
-
-                toggleItem.OnValueChanged += v =>
-                {
-                    manager.SetValue(config.FieldName, v);
-                };
+                CreateToggleField(config, itemParent, manager);
+                return;
             }
-            else
-            {
-                LogUtil.Error("GameSettingUIController: Unsupported field type {0}", config.Type);
-            }
+
+            LogUtil.Error("GameSettingUIController: Unsupported field type {0}", config.Type);
         }
 
-        /// <summary>
-        /// 根据 GroupName 切换当前显示的字段（仅在启用 Tab 模式时使用）
-        /// </summary>
-        /// <param name="groupName">要显示的分组名称</param>
-        private void ShowGroup(string groupName)
+        private void CreateSelectField(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
         {
-            if (_currentTemplate == null || _currentManager == null)
+            if (SelectItemPrefab == null)
             {
-                LogUtil.Error("GameSettingUIController: ShowGroup called before GenerateUI");
+                LogUtil.Error("GameSettingUIController: SelectItemPrefab is not configured");
                 return;
             }
 
-            if (EntryRoot == null)
+            SelectSettingItemUIController selectItem =
+                NodeController.Create<SelectSettingItemUIController>(SelectItemPrefab, parent);
+            if (selectItem == null)
             {
-                LogUtil.Error("GameSettingUIController: EntryRoot is not configured");
+                LogUtil.Error(
+                    "GameSettingUIController: SelectItemPrefab for field {0} does not have a SelectSettingItemUIController",
+                    config.FieldName);
                 return;
             }
 
-            // 清空当前 Entry
-            ClearUI();
-
-            // 找到目标分组并按 FieldOrder 排序生成
-            var fieldsInGroup = _currentTemplate.Fields
-                .Where(f => f.GroupName == groupName)
-                .OrderBy(f => f.FieldOrder);
-
-            foreach (var fieldConfig in fieldsInGroup)
+            SelectGameSettingFieldConfig selectConfig = config as SelectGameSettingFieldConfig;
+            if (selectConfig == null)
             {
-                CreateFieldUI(fieldConfig, EntryRoot, _currentManager);
+                LogUtil.Error(
+                    "GameSettingUIController: Config for field {0} is not SelectGameSettingFieldConfig",
+                    config.FieldName);
+                return;
             }
 
-            // 更新 Tab 高亮
-            foreach (var kv in _tabs)
-            {
-                var tabGO = kv.Value;
-                if (tabGO == null) continue;
+            selectItem.name = "Select_" + config.FieldName;
 
-                var img = tabGO.GetComponent<Image>();
-                if (img != null)
+            string[] options = selectConfig.Options ?? Array.Empty<string>();
+            string[] displayTexts = options;
+            if (selectConfig.DisplayOptions != null && selectConfig.DisplayOptions.Length == options.Length)
+            {
+                displayTexts = new string[options.Length];
+                for (int i = 0; i < options.Length; i++)
+                    displayTexts[i] = GetDisplayText(selectConfig.DisplayOptions[i], options[i]);
+            }
+
+            selectItem.SetOptions(displayTexts);
+
+            int initialIndex = 0;
+            if (options.Length > 0)
+            {
+                object currentValue = manager.GetValue(config.FieldName);
+                if (currentValue != null)
                 {
-                    img.color = kv.Key == groupName
-                        ? new Color(1f, 1f, 1f)
-                        : new Color(0.8f, 0.8f, 0.8f);
+                    int found = Array.IndexOf(options, Convert.ToString(currentValue));
+                    if (found >= 0)
+                        initialIndex = found;
                 }
             }
+
+            selectItem.SetSelectedIndex(initialIndex);
+            selectItem.OnSelectedIndexChanged += index =>
+            {
+                if (index < 0 || index >= options.Length)
+                    return;
+
+                manager.SetValue(config.FieldName, options[index]);
+            };
         }
 
-        /// <summary>
-        /// 创建一个 Tab 并绑定点击事件
-        /// </summary>
-        private void CreateTab(string groupName)
+        private void CreateNumberField(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
         {
-            if (TabRoot == null || TabPrefab == null)
+            if (NumberItemPrefab == null)
             {
+                LogUtil.Error("GameSettingUIController: NumberItemPrefab is not configured");
                 return;
             }
 
-            var tab = GameObject.Instantiate(TabPrefab, TabRoot);
-            tab.name = $"Tab_{groupName}";
-            _tabs[groupName] = tab;
-
-            // 设置显示文本（如果有）
-            var tmpText = tab.GetComponentInChildren<TMP_Text>();
-            if (tmpText != null)
+            NumberSettingItemUIController numberItem =
+                NodeController.Create<NumberSettingItemUIController>(NumberItemPrefab, parent);
+            if (numberItem == null)
             {
-                tmpText.text = groupName;
+                LogUtil.Error(
+                    "GameSettingUIController: NumberItemPrefab for field {0} does not have a NumberSettingItemUIController",
+                    config.FieldName);
+                return;
             }
-            else
+
+            NumberGameSettingFieldConfig numberConfig = config as NumberGameSettingFieldConfig;
+            if (numberConfig == null)
             {
-                var uiText = tab.GetComponentInChildren<UnityEngine.UI.Text>();
-                if (uiText != null)
+                LogUtil.Error(
+                    "GameSettingUIController: Config for field {0} is not NumberGameSettingFieldConfig",
+                    config.FieldName);
+                return;
+            }
+
+            numberItem.name = "Number_" + config.FieldName;
+            numberItem.SetConfig(numberConfig);
+
+            object currentValueObj = manager.GetValue(config.FieldName);
+            float initialValue = numberConfig.Default;
+            if (currentValueObj != null)
+            {
+                try
                 {
-                    uiText.text = groupName;
+                    initialValue = Convert.ToSingle(currentValueObj);
+                }
+                catch
+                {
+                    initialValue = numberConfig.Default;
                 }
             }
 
-            var button = tab.GetComponent<Button>();
-            if (button != null)
-            {
-                string captured = groupName;
-                button.onClick.AddListener(() => ShowGroup(captured));
-            }
+            numberItem.SetValue(initialValue);
+            numberItem.OnValueChanged += value => manager.SetValue(config.FieldName, value);
         }
 
-        /// <summary>
-        /// 清理 EntryRoot 中的所有字段条目
-        /// </summary>
+        private void CreateToggleField(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
+        {
+            if (ToggleItemPrefab == null)
+            {
+                LogUtil.Error("GameSettingUIController: ToggleItemPrefab is not configured");
+                return;
+            }
+
+            ToggleSettingItemUIController toggleItem =
+                NodeController.Create<ToggleSettingItemUIController>(ToggleItemPrefab, parent);
+            if (toggleItem == null)
+            {
+                LogUtil.Error(
+                    "GameSettingUIController: ToggleItemPrefab for field {0} does not have a ToggleSettingItemUIController",
+                    config.FieldName);
+                return;
+            }
+
+            ToggleGameSettingFieldConfig toggleConfig = config as ToggleGameSettingFieldConfig;
+            if (toggleConfig == null)
+            {
+                LogUtil.Error(
+                    "GameSettingUIController: Config for field {0} is not ToggleGameSettingFieldConfig",
+                    config.FieldName);
+                return;
+            }
+
+            toggleItem.name = "Toggle_" + config.FieldName;
+            toggleItem.SetConfig(toggleConfig);
+
+            object currentValueObj = manager.GetValue(config.FieldName);
+            bool initialValue = toggleConfig.Default;
+            if (currentValueObj != null)
+            {
+                try
+                {
+                    initialValue = Convert.ToBoolean(currentValueObj);
+                }
+                catch
+                {
+                    initialValue = toggleConfig.Default;
+                }
+            }
+
+            toggleItem.SetValue(initialValue);
+            toggleItem.OnValueChanged += value => manager.SetValue(config.FieldName, value);
+        }
+
         private void ClearUI()
         {
             if (EntryRoot == null)
-            {
                 return;
-            }
 
             for (int i = EntryRoot.childCount - 1; i >= 0; i--)
             {
-                var child = EntryRoot.GetChild(i);
+                Transform child = EntryRoot.GetChild(i);
                 if (child != null)
-                {
                     Destroy(child.gameObject);
-                }
             }
         }
 
-        /// <summary>
-        /// 清理所有 Tabs（如果有）
-        /// </summary>
         private void ClearTabs()
         {
-            if (TabRoot != null)
+            if (CategoryTabRoot != null)
             {
-                for (int i = TabRoot.childCount - 1; i >= 0; i--)
+                for (int i = CategoryTabRoot.childCount - 1; i >= 0; i--)
                 {
-                    var child = TabRoot.GetChild(i);
+                    Transform child = CategoryTabRoot.GetChild(i);
                     if (child != null)
-                    {
                         Destroy(child.gameObject);
-                    }
                 }
             }
 
-            _tabs.Clear();
+            categoryTabs.Clear();
+        }
+
+        private static string GetDisplayText(MultiLingualText text, string fallback)
+        {
+            string display = text?.GetText();
+            return string.IsNullOrEmpty(display) ? fallback : display;
         }
 
         protected override void OnRelease()
         {
             ClearUI();
+            ClearTabs();
             base.OnRelease();
         }
-
     }
-
 }

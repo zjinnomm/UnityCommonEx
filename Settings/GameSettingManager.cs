@@ -36,12 +36,12 @@ namespace UnityCommonEx
 
         public void ApplyFieldCallbacks(GameSettingTemplate template)
         {
-            if (template?.Fields == null)
+            if (template == null)
                 return;
 
             _immediateFields.Clear();
 
-            foreach (var fieldConfig in template.Fields)
+            foreach (var fieldConfig in template.EnumerateFields())
             {
                 if (fieldConfig == null)
                     continue;
