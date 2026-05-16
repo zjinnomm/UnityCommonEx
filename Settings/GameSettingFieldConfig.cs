@@ -1,3 +1,4 @@
+using System;
 using Newtonsoft.Json;
 
 namespace UnityCommonEx
@@ -20,6 +21,17 @@ namespace UnityCommonEx
             RegisterTypeReflection(typeof(NumberGameSettingFieldConfig), GameSettingFieldType.Number);
             RegisterTypeReflection(typeof(ToggleGameSettingFieldConfig), GameSettingFieldType.Toggle);
         }
+
+        public string GetDisplayNameText()
+        {
+            return GetDisplayText(DisplayName, FieldName);
+        }
+
+        public static string GetDisplayText(MultiLingualText text, string fallback)
+        {
+            string display = text?.GetText();
+            return string.IsNullOrEmpty(display) ? fallback : display;
+        }
     }
 
     public class SelectGameSettingFieldConfig : GameSettingFieldConfig
@@ -29,6 +41,30 @@ namespace UnityCommonEx
 
         [JsonProperty(Required = Required.Default)]
         public MultiLingualText[] DisplayOptions;
+
+        public string[] GetDisplayOptionTexts()
+        {
+            string[] options = Options ?? Array.Empty<string>();
+            string[] displayTexts = options;
+            if (DisplayOptions != null && DisplayOptions.Length == options.Length)
+            {
+                displayTexts = new string[options.Length];
+                for (int i = 0; i < options.Length; i++)
+                    displayTexts[i] = GetDisplayText(DisplayOptions[i], options[i]);
+            }
+
+            return displayTexts;
+        }
+
+        public int GetSelectedIndex(string currentValue)
+        {
+            string[] options = Options ?? Array.Empty<string>();
+            if (options.Length == 0 || string.IsNullOrEmpty(currentValue))
+                return 0;
+
+            int index = Array.IndexOf(options, currentValue);
+            return index >= 0 ? index : 0;
+        }
     }
 
     public class NumberGameSettingFieldConfig : GameSettingFieldConfig

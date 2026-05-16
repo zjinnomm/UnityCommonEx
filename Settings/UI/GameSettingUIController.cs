@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -28,6 +27,8 @@ namespace UnityCommonEx
         private IGameSettingManager currentManager;
         private readonly Dictionary<string, CommonSelectableListItemUIController> categoryTabs =
             new Dictionary<string, CommonSelectableListItemUIController>();
+        private readonly Dictionary<GameSettingFieldType, GameSettingFieldUIBinder> fieldBinders =
+            new Dictionary<GameSettingFieldType, GameSettingFieldUIBinder>();
 
         public bool IsGenerated => currentTemplate != null;
 
@@ -141,7 +142,7 @@ namespace UnityCommonEx
             }
 
             header.name = "Group_" + group.GroupName;
-            header.SetLabel(GetDisplayText(group.DisplayName, group.GroupName));
+            header.SetLabel(GameSettingFieldConfig.GetDisplayText(group.DisplayName, group.GroupName));
         }
 
         private void CreateCategoryTab(GameSettingCategoryConfig category)
@@ -158,7 +159,7 @@ namespace UnityCommonEx
             }
 
             tab.name = "Tab_" + category.CategoryName;
-            tab.SetItem(GetDisplayText(category.DisplayName, category.CategoryName));
+            tab.SetItem(GameSettingFieldConfig.GetDisplayText(category.DisplayName, category.CategoryName));
             tab.OnDeselected();
             if (tab.InteractiveButton != null)
                 tab.InteractiveButton.onClick.AddListener(() => ShowCategory(category.CategoryName));
@@ -196,187 +197,43 @@ namespace UnityCommonEx
             }
 
             entry.name = "Entry_" + config.FieldName;
-            entry.SetLabel(GetDisplayText(config.DisplayName, config.FieldName));
+            entry.SetLabel(config.DisplayName, config.FieldName);
 
-            Transform itemParent = entry.GetSettingItemRoot();
-
-            if (config.Type == GameSettingFieldType.Select)
+            GameSettingFieldUIBinder binder = GetFieldBinder(config.Type);
+            if (binder != null)
             {
-                CreateSelectField(config, itemParent, manager);
-                return;
-            }
-
-            if (config.Type == GameSettingFieldType.Number)
-            {
-                CreateNumberField(config, itemParent, manager);
-                return;
-            }
-
-            if (config.Type == GameSettingFieldType.Toggle)
-            {
-                CreateToggleField(config, itemParent, manager);
+                binder.Bind(config, entry, manager);
                 return;
             }
 
             LogUtil.Error("GameSettingUIController: Unsupported field type {0}", config.Type);
         }
 
-        private void CreateSelectField(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
+        private GameSettingFieldUIBinder GetFieldBinder(GameSettingFieldType fieldType)
         {
-            if (SelectItemPrefab == null)
-            {
-                LogUtil.Error("GameSettingUIController: SelectItemPrefab is not configured");
-                return;
-            }
+            if (fieldBinders.TryGetValue(fieldType, out GameSettingFieldUIBinder binder))
+                return binder;
 
-            SelectSettingItemUIController selectItem =
-                NodeController.Create<SelectSettingItemUIController>(SelectItemPrefab, parent);
-            if (selectItem == null)
-            {
-                LogUtil.Error(
-                    "GameSettingUIController: SelectItemPrefab for field {0} does not have a SelectSettingItemUIController",
-                    config.FieldName);
-                return;
-            }
+            binder = CreateFieldBinder(fieldType);
+            if (binder != null)
+                fieldBinders[fieldType] = binder;
 
-            SelectGameSettingFieldConfig selectConfig = config as SelectGameSettingFieldConfig;
-            if (selectConfig == null)
-            {
-                LogUtil.Error(
-                    "GameSettingUIController: Config for field {0} is not SelectGameSettingFieldConfig",
-                    config.FieldName);
-                return;
-            }
-
-            selectItem.name = "Select_" + config.FieldName;
-
-            string[] options = selectConfig.Options ?? Array.Empty<string>();
-            string[] displayTexts = options;
-            if (selectConfig.DisplayOptions != null && selectConfig.DisplayOptions.Length == options.Length)
-            {
-                displayTexts = new string[options.Length];
-                for (int i = 0; i < options.Length; i++)
-                    displayTexts[i] = GetDisplayText(selectConfig.DisplayOptions[i], options[i]);
-            }
-
-            selectItem.SetOptions(displayTexts);
-
-            int initialIndex = 0;
-            if (options.Length > 0)
-            {
-                object currentValue = manager.GetValue(config.FieldName);
-                if (currentValue != null)
-                {
-                    int found = Array.IndexOf(options, Convert.ToString(currentValue));
-                    if (found >= 0)
-                        initialIndex = found;
-                }
-            }
-
-            selectItem.SetSelectedIndex(initialIndex);
-            selectItem.OnSelectedIndexChanged += index =>
-            {
-                if (index < 0 || index >= options.Length)
-                    return;
-
-                manager.SetValue(config.FieldName, options[index]);
-            };
+            return binder;
         }
 
-        private void CreateNumberField(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
+        private GameSettingFieldUIBinder CreateFieldBinder(GameSettingFieldType fieldType)
         {
-            if (NumberItemPrefab == null)
+            switch (fieldType)
             {
-                LogUtil.Error("GameSettingUIController: NumberItemPrefab is not configured");
-                return;
+                case GameSettingFieldType.Select:
+                    return new SelectGameSettingFieldUIBinder(SelectItemPrefab);
+                case GameSettingFieldType.Number:
+                    return new NumberGameSettingFieldUIBinder(NumberItemPrefab);
+                case GameSettingFieldType.Toggle:
+                    return new ToggleGameSettingFieldUIBinder(ToggleItemPrefab);
+                default:
+                    return null;
             }
-
-            NumberSettingItemUIController numberItem =
-                NodeController.Create<NumberSettingItemUIController>(NumberItemPrefab, parent);
-            if (numberItem == null)
-            {
-                LogUtil.Error(
-                    "GameSettingUIController: NumberItemPrefab for field {0} does not have a NumberSettingItemUIController",
-                    config.FieldName);
-                return;
-            }
-
-            NumberGameSettingFieldConfig numberConfig = config as NumberGameSettingFieldConfig;
-            if (numberConfig == null)
-            {
-                LogUtil.Error(
-                    "GameSettingUIController: Config for field {0} is not NumberGameSettingFieldConfig",
-                    config.FieldName);
-                return;
-            }
-
-            numberItem.name = "Number_" + config.FieldName;
-            numberItem.SetConfig(numberConfig);
-
-            object currentValueObj = manager.GetValue(config.FieldName);
-            float initialValue = numberConfig.Default;
-            if (currentValueObj != null)
-            {
-                try
-                {
-                    initialValue = Convert.ToSingle(currentValueObj);
-                }
-                catch
-                {
-                    initialValue = numberConfig.Default;
-                }
-            }
-
-            numberItem.SetValue(initialValue);
-            numberItem.OnValueChanged += value => manager.SetValue(config.FieldName, value);
-        }
-
-        private void CreateToggleField(GameSettingFieldConfig config, Transform parent, IGameSettingManager manager)
-        {
-            if (ToggleItemPrefab == null)
-            {
-                LogUtil.Error("GameSettingUIController: ToggleItemPrefab is not configured");
-                return;
-            }
-
-            ToggleSettingItemUIController toggleItem =
-                NodeController.Create<ToggleSettingItemUIController>(ToggleItemPrefab, parent);
-            if (toggleItem == null)
-            {
-                LogUtil.Error(
-                    "GameSettingUIController: ToggleItemPrefab for field {0} does not have a ToggleSettingItemUIController",
-                    config.FieldName);
-                return;
-            }
-
-            ToggleGameSettingFieldConfig toggleConfig = config as ToggleGameSettingFieldConfig;
-            if (toggleConfig == null)
-            {
-                LogUtil.Error(
-                    "GameSettingUIController: Config for field {0} is not ToggleGameSettingFieldConfig",
-                    config.FieldName);
-                return;
-            }
-
-            toggleItem.name = "Toggle_" + config.FieldName;
-            toggleItem.SetConfig(toggleConfig);
-
-            object currentValueObj = manager.GetValue(config.FieldName);
-            bool initialValue = toggleConfig.Default;
-            if (currentValueObj != null)
-            {
-                try
-                {
-                    initialValue = Convert.ToBoolean(currentValueObj);
-                }
-                catch
-                {
-                    initialValue = toggleConfig.Default;
-                }
-            }
-
-            toggleItem.SetValue(initialValue);
-            toggleItem.OnValueChanged += value => manager.SetValue(config.FieldName, value);
         }
 
         private void ClearUI()
@@ -406,13 +263,6 @@ namespace UnityCommonEx
 
             categoryTabs.Clear();
         }
-
-        private static string GetDisplayText(MultiLingualText text, string fallback)
-        {
-            string display = text?.GetText();
-            return string.IsNullOrEmpty(display) ? fallback : display;
-        }
-
         protected override void OnRelease()
         {
             ClearUI();

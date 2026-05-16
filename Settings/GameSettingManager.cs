@@ -9,6 +9,7 @@ namespace UnityCommonEx
     public interface IGameSettingManager
     {
         object GetValue(string fieldName);
+        TValue GetValue<TValue>(string fieldName, TValue fallback = default);
         void SetValue(string fieldName, object value);
     }
 
@@ -272,6 +273,26 @@ namespace UnityCommonEx
             }
         }
 
+        public TValue GetValue<TValue>(string fieldName, TValue fallback = default)
+        {
+            object value = GetValue(fieldName);
+            if (value == null)
+                return fallback;
+
+            try
+            {
+                object converted = ConvertValue(value, typeof(TValue));
+                if (converted is TValue typedValue)
+                    return typedValue;
+            }
+            catch (Exception ex)
+            {
+                LogUtil.Warn("GameSettingManager: Error converting field '{0}' to {1}: {2}", fieldName, typeof(TValue).Name, ex.Message);
+            }
+
+            return fallback;
+        }
+
         private object ConvertValue(object value, Type targetType)
         {
             if (value == null)
@@ -284,6 +305,9 @@ namespace UnityCommonEx
             Type underlyingType = Nullable.GetUnderlyingType(targetType);
             if (underlyingType != null)
                 targetType = underlyingType;
+
+            if (targetType == typeof(string))
+                return value.ToString();
 
             if (targetType.IsEnum)
             {
