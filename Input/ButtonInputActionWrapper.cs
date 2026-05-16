@@ -3,7 +3,7 @@ using UnityEngine.UI;
 
 namespace UnityCommonEx
 {
-    public abstract class ButtonInputActionWrapper<TAction> : NodeController, IInputActionWrapper<TAction> where TAction : Enum
+    public abstract class ButtonInputActionWrapper<TAction> : NodeController, IInputActionWrapper<TAction> where TAction : struct, Enum
     {
         public TAction Action;
         public Button Button;

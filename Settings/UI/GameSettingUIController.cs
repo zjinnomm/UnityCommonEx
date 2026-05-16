@@ -12,6 +12,7 @@ namespace UnityCommonEx
         public GameObject SelectItemPrefab;
         public GameObject NumberItemPrefab;
         public GameObject ToggleItemPrefab;
+        public GameObject InputBindingItemPrefab;
         public GameObject GroupHeaderPrefab;
 
         [Header("UI Roots")]
@@ -130,7 +131,7 @@ namespace UnityCommonEx
 
         private void CreateGroupHeader(GameSettingGroupConfig group, Transform parent)
         {
-            if (GroupHeaderPrefab == null || group == null || parent == null)
+            if (GroupHeaderPrefab == null || group == null || parent == null || string.IsNullOrEmpty(group.GroupName))
                 return;
 
             SettingGroupHeaderUIController header =
@@ -231,6 +232,8 @@ namespace UnityCommonEx
                     return new NumberGameSettingFieldUIBinder(NumberItemPrefab);
                 case GameSettingFieldType.Toggle:
                     return new ToggleGameSettingFieldUIBinder(ToggleItemPrefab);
+                case GameSettingFieldType.InputBinding:
+                    return new InputBindingGameSettingFieldUIBinder(InputBindingItemPrefab);
                 default:
                     return null;
             }

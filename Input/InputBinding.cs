@@ -18,6 +18,8 @@ namespace UnityCommonEx
         public InputMouseButton MouseButton;
         [JsonProperty(Required = Required.Default)]
         public InputBindingTriggerType TriggerType;
+        [JsonProperty(Required = Required.Default)]
+        public bool Rebindable = true;
 
         public static InputBinding Keyboard(KeyCode key, InputBindingTriggerType triggerType)
         {
@@ -55,6 +57,67 @@ namespace UnityCommonEx
                 DeviceType = InputBindingDeviceType.MouseWheelDown,
                 TriggerType = InputBindingTriggerType.Pressed
             };
+        }
+
+        public InputBinding Clone()
+        {
+            return new InputBinding
+            {
+                DeviceType = DeviceType,
+                Key = Key,
+                MouseButton = MouseButton,
+                TriggerType = TriggerType,
+                Rebindable = Rebindable
+            };
+        }
+
+        public string GetBindingKey()
+        {
+            switch (DeviceType)
+            {
+                case InputBindingDeviceType.KeyboardKey:
+                    return "Keyboard:" + Key;
+                case InputBindingDeviceType.MouseButton:
+                    return "MouseButton:" + MouseButton;
+                case InputBindingDeviceType.MouseWheelUp:
+                    return "MouseWheel:Up";
+                case InputBindingDeviceType.MouseWheelDown:
+                    return "MouseWheel:Down";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        public string GetDisplayText()
+        {
+            switch (DeviceType)
+            {
+                case InputBindingDeviceType.KeyboardKey:
+                    return Key.ToString();
+                case InputBindingDeviceType.MouseButton:
+                    return MouseButton.ToString();
+                case InputBindingDeviceType.MouseWheelUp:
+                    return "Wheel Up";
+                case InputBindingDeviceType.MouseWheelDown:
+                    return "Wheel Down";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        public bool MatchesPhysicalInput(InputBinding other)
+        {
+            return other != null && GetBindingKey() == other.GetBindingKey();
+        }
+
+        public bool MatchesExact(InputBinding other)
+        {
+            return other != null &&
+                DeviceType == other.DeviceType &&
+                Key == other.Key &&
+                MouseButton == other.MouseButton &&
+                TriggerType == other.TriggerType &&
+                Rebindable == other.Rebindable;
         }
 
         public bool MatchesKeyboardKey(KeyCode key)

@@ -20,6 +20,7 @@ namespace UnityCommonEx
             RegisterTypeReflection(typeof(SelectGameSettingFieldConfig), GameSettingFieldType.Select);
             RegisterTypeReflection(typeof(NumberGameSettingFieldConfig), GameSettingFieldType.Number);
             RegisterTypeReflection(typeof(ToggleGameSettingFieldConfig), GameSettingFieldType.Toggle);
+            RegisterTypeReflection(typeof(InputBindingGameSettingFieldConfig), GameSettingFieldType.InputBinding);
         }
 
         public string GetDisplayNameText()
@@ -86,5 +87,11 @@ namespace UnityCommonEx
     {
         [JsonProperty(Required = Required.Default)]
         public bool Default = false;
+    }
+
+    public class InputBindingGameSettingFieldConfig : GameSettingFieldConfig
+    {
+        [JsonProperty(Required = Required.Default)]
+        public string Action;
     }
 }

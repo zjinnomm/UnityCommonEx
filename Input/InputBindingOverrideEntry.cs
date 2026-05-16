@@ -4,12 +4,15 @@ using Newtonsoft.Json;
 namespace UnityCommonEx
 {
     [Serializable]
-    public class ActionInputBinding<TAction> where TAction : struct, Enum
+    public class InputBindingOverrideEntry<TAction> where TAction : struct, Enum
     {
         [JsonProperty(Required = Required.Default)]
         public TAction Action;
 
         [JsonProperty(Required = Required.Default)]
-        public InputBinding[] Bindings;
+        public int SlotIndex;
+
+        [JsonProperty(Required = Required.Default)]
+        public InputBinding Binding;
     }
 }

@@ -117,4 +117,25 @@ namespace UnityCommonEx
             item.OnValueChanged += value => manager.SetValue(config.FieldName, value);
         }
     }
+
+    public sealed class InputBindingGameSettingFieldUIBinder
+        : GameSettingFieldUIBinder<InputBindingGameSettingFieldConfig, InputBindingSettingItemUIController>
+    {
+        public InputBindingGameSettingFieldUIBinder(GameObject prefab) : base(prefab, "InputBindingItemPrefab") { }
+
+        public override GameSettingFieldType FieldType => GameSettingFieldType.InputBinding;
+
+        protected override string GetItemName(string fieldName) => "InputBinding_" + fieldName;
+
+        protected override void BindTyped(InputBindingGameSettingFieldConfig config, InputBindingSettingItemUIController item, IGameSettingManager manager)
+        {
+            if (InputBindingSettingsRegistry.ActiveManager == null)
+            {
+                LogUtil.Error("GameSettingUIController: InputBindingSettingsManager is not initialized.");
+                return;
+            }
+
+            item.SetConfig(config, InputBindingSettingsRegistry.ActiveManager);
+        }
+    }
 }
