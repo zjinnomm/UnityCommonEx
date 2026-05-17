@@ -8,7 +8,6 @@ namespace UnityCommonEx
     {
         Highlight,
         Text,
-        Input,
     }
 
     [JsonConverter(typeof(TypeReflectableDataConverter<TutorialEntry, TutorialEntryType>))]
@@ -20,7 +19,6 @@ namespace UnityCommonEx
         {
             RegisterTypeReflection(typeof(HighlightTutorialEntry), TutorialEntryType.Highlight);
             RegisterTypeReflection(typeof(TextTutorialEntry), TutorialEntryType.Text);
-            RegisterTypeReflection(typeof(InputTutorialEntry), TutorialEntryType.Input);
         }
 
         [JsonProperty(Required = Required.Default)]
@@ -28,14 +26,10 @@ namespace UnityCommonEx
         [JsonProperty(Required = Required.Default)]
         public float Duration = -1;
         [JsonProperty(Required = Required.Default)]
-        public Vector2 Position = Vector2.zero;
-        [JsonProperty(Required = Required.Default)]
-        public Vector2 Size = Vector2.zero;
+        public int RectIndex = 0;
 
         [JsonIgnore]
         public virtual bool IsBlocking => false;
-
-        protected Rect GetRegion(Rect rectOverride) => new Rect(rectOverride.min + Position, rectOverride.size + Size);
 
         public virtual void OnActivate(ref TutorialManager.ActivatedEntry record) { }
         public virtual void OnUpdate(float delta, ref TutorialManager.ActivatedEntry record) { }

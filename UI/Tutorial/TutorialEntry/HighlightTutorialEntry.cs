@@ -17,7 +17,7 @@ namespace UnityCommonEx
 
         public override void OnActivate(ref TutorialManager.ActivatedEntry record)
         {
-            TutorialUIController.Instance.AddVeilMask(record.Index, GetRegion(record.RectOverride), Shape);
+            TutorialUIController.Instance.AddVeilMask(record.Index, record.Rect, Shape);
         }
 
         public override void OnDeactivate(ref TutorialManager.ActivatedEntry record)
