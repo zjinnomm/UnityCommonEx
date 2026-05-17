@@ -26,6 +26,8 @@ namespace UnityCommonEx
         public float MaxDuration = -1;
         [JsonProperty(Required = Required.Default)]
         public bool WithVeil = true;
+        [JsonProperty(Required = Required.Default)]
+        public bool PauseGameplay = false;
 
     }
 

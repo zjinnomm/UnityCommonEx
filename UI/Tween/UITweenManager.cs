@@ -12,6 +12,8 @@ namespace UnityCommonEx
 
         public bool IsTicking() => Tweens.Count > 0;
 
+        public TickType GetTickType() => TickType.UI;
+
         public void Tick(float delta)
         {
             for (int i = Tweens.Count - 1; i >= 0; i--)

@@ -14,7 +14,7 @@ namespace UnityCommonEx
         /// </summary>
         static bool isTicking = false;
 
-        public static void Tick(float delta)
+        public static void Tick(float gameDelta, float uiDelta)
         {
             // 设置标志位：开始 Tick
             isTicking = true;
@@ -36,7 +36,11 @@ namespace UnityCommonEx
             // 遍历并 Tick
             foreach (var tickable in tickables)
             {
-                tickable.Tick(delta);
+                float delta = tickable.GetTickType() == TickType.UI ? uiDelta : gameDelta;
+                if (delta > 0f)
+                {
+                    tickable.Tick(delta);
+                }
                 if (!tickable.IsTicking())
                 {
                     toRemove.Add(tickable);

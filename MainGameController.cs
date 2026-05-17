@@ -5,6 +5,29 @@ namespace UnityCommonEx
 
     public abstract class MainGameController<T> : SingletonController<T> where T : MainGameController<T>
     {
+        static float gameDilation = 1f;
+        static int gameplayPauseRequestCount = 0;
+
+        public static float GameDilation
+        {
+            get => gameDilation;
+            set => gameDilation = Mathf.Max(0f, value);
+        }
+
+        public static float EffectiveGameDilation => gameplayPauseRequestCount > 0 ? 0f : gameDilation;
+
+        public static void PushGameplayPause()
+        {
+            gameplayPauseRequestCount++;
+        }
+
+        public static void PopGameplayPause()
+        {
+            if (gameplayPauseRequestCount > 0)
+            {
+                gameplayPauseRequestCount--;
+            }
+        }
 
         public Transform NodeRoot;
 
@@ -76,10 +99,14 @@ namespace UnityCommonEx
         void Update()
         {
             InteractionModel.Update();
-            float delta = Time.deltaTime;
-            TickingManager.Tick(delta);
-            TimerManager.Tick(delta);
-            OnUpdate(delta);
+            float uiDelta = Time.deltaTime;
+            float gameDelta = uiDelta * EffectiveGameDilation;
+            TickingManager.Tick(gameDelta, uiDelta);
+            TimerManager.Tick(uiDelta);
+            if (gameDelta > 0f)
+            {
+                OnUpdate(gameDelta);
+            }
         }
 
         virtual protected void OnUpdate(float delta) { }

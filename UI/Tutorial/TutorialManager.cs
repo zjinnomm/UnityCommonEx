@@ -22,6 +22,7 @@ namespace UnityCommonEx
         public uint MaskId { get; private set; }
         Dictionary<int, Rect> RectOverrides;
         Action OnTutorialEndCallback;
+        bool PausedGameplay;
         List<ActivatedEntry> ActivatedEntries = new List<ActivatedEntry>();
         HashSet<int> ToBeDeactivatedIndexes = new HashSet<int>();
         int NextEntryIndex = 0;
@@ -34,6 +35,8 @@ namespace UnityCommonEx
         }
 
         public bool IsTicking() => true;
+
+        public TickType GetTickType() => TickType.UI;
 
         public void Tick(float delta)
         {
@@ -168,6 +171,11 @@ namespace UnityCommonEx
             {
                 ui.SetVeilEnabled(false);
             }
+            if (tutorial.PauseGameplay)
+            {
+                MainGameController<HubbleBubbleGame>.PushGameplayPause();
+                PausedGameplay = true;
+            }
 
             TickingManager.Register(this);
         }
@@ -235,6 +243,11 @@ namespace UnityCommonEx
             {
                 InteractionModel.RemoveMask(MaskId);
                 MaskId = 0;
+            }
+            if (PausedGameplay)
+            {
+                MainGameController<HubbleBubbleGame>.PopGameplayPause();
+                PausedGameplay = false;
             }
 
             if (Tutorial == null)
