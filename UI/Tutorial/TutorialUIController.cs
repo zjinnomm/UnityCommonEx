@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace UnityCommonEx
 {
@@ -36,11 +37,25 @@ namespace UnityCommonEx
         public GameObject Veil;
         public Transform VeilMaskRoot;
         public Transform TextRoot;
-        
+
+        EventTrigger skipEventTrigger;
+        EventTrigger.Entry skipPointerClickEntry;
 
         List<Image> CachedVeilMasks = new List<Image>();
         List<TMP_Text> CachedTexts = new List<TMP_Text>();
         List<ActivatedEntry> ActivatedEntries = new List<ActivatedEntry>();
+
+        protected override void OnInit()
+        {
+            base.OnInit();
+            SetupSkipInteraction();
+        }
+
+        protected override void OnRelease()
+        {
+            TeardownSkipInteraction();
+            base.OnRelease();
+        }
 
         public void SetVeilEnabled(bool enabled)
         {
@@ -245,6 +260,47 @@ namespace UnityCommonEx
             }
 
             return Instantiate(TextPrefab, TextRoot).GetComponent<TMP_Text>();
+        }
+
+        void SetupSkipInteraction()
+        {
+            GameObject target = Veil != null ? Veil : gameObject;
+            if (target == null)
+            {
+                return;
+            }
+
+            skipEventTrigger = target.GetComponent<EventTrigger>();
+            if (skipEventTrigger == null)
+            {
+                skipEventTrigger = target.AddComponent<EventTrigger>();
+            }
+            if (skipEventTrigger.triggers == null)
+            {
+                skipEventTrigger.triggers = new List<EventTrigger.Entry>();
+            }
+
+            skipPointerClickEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerClick };
+            skipPointerClickEntry.callback.AddListener(_ => OnSkipPointerClick());
+            skipEventTrigger.triggers.Add(skipPointerClickEntry);
+        }
+
+        void TeardownSkipInteraction()
+        {
+            if (skipEventTrigger == null || skipPointerClickEntry == null)
+            {
+                return;
+            }
+
+            skipPointerClickEntry.callback.RemoveAllListeners();
+            skipEventTrigger.triggers.Remove(skipPointerClickEntry);
+            skipPointerClickEntry = null;
+            skipEventTrigger = null;
+        }
+
+        void OnSkipPointerClick()
+        {
+            TutorialManager.Instance?.SkipActiveEntries();
         }
 
         void PrepareTextLayout(TMP_Text text)

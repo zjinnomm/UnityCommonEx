@@ -33,7 +33,11 @@ namespace UnityCommonEx
         {
             UITween tween = PrepareTween(obj, loopTimes);
             tween.Config = config;
-            tween.PropType = config.PropType;
+            if (UITweenPropTypeUtil.HasInvalidBits(config.PropType))
+            {
+                LogUtil.Warn("UITweenManager: invalid PropType bits detected ({0}), sanitizing to {1}", (byte)config.PropType, (byte)UITweenPropTypeUtil.Sanitize(config.PropType));
+            }
+            tween.PropType = UITweenPropTypeUtil.Sanitize(config.PropType);
             tween.IsActive = true;
 
             if (startProgress > 0f)

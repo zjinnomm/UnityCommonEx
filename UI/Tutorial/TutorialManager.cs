@@ -19,6 +19,7 @@ namespace UnityCommonEx
         }
 
         TutorialTemplate Tutorial;
+        public bool HasActiveTutorial => Tutorial != null;
         public uint MaskId { get; private set; }
         Dictionary<int, Rect> RectOverrides;
         Action OnTutorialEndCallback;
@@ -30,6 +31,15 @@ namespace UnityCommonEx
 
         public void Initialize(Func<TutorialUIController> showFunc, Action hideFunc)
         {
+            Tutorial = null;
+            MaskId = 0;
+            RectOverrides = null;
+            OnTutorialEndCallback = null;
+            PausedGameplay = false;
+            ActivatedEntries.Clear();
+            ToBeDeactivatedIndexes.Clear();
+            NextEntryIndex = 0;
+            ElapsedTime = 0;
             ShowUIFunc = showFunc;
             HideUIFunc = hideFunc;
         }
@@ -132,6 +142,28 @@ namespace UnityCommonEx
             {
                 ToBeDeactivatedIndexes.Add(ActivatedEntries[i].Index);
             }
+        }
+
+        public bool SkipActiveEntries()
+        {
+            if (Tutorial == null || ActivatedEntries.Count == 0)
+            {
+                return false;
+            }
+
+            bool skipped = false;
+            for (int i = 0; i < ActivatedEntries.Count; i++)
+            {
+                ActivatedEntry record = ActivatedEntries[i];
+                TutorialEntry entry = Tutorial.Entries[record.Index];
+                if (entry != null && entry.CanSkip)
+                {
+                    ToBeDeactivatedIndexes.Add(record.Index);
+                    skipped = true;
+                }
+            }
+
+            return skipped;
         }
 
         public void StartTutorial(TutorialTemplate tutorial, Action onTutorialEndCallback = null, Dictionary<int, Rect> rectOverrides = null)

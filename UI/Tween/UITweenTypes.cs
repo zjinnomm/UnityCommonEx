@@ -13,6 +13,26 @@ namespace UnityCommonEx
         Scale = 0b10000
     }
 
+    public static class UITweenPropTypeUtil
+    {
+        public const byte ValidMask =
+            (byte)UITweenPropType.Position |
+            (byte)UITweenPropType.Alpha |
+            (byte)UITweenPropType.SizeX |
+            (byte)UITweenPropType.SizeY |
+            (byte)UITweenPropType.Scale;
+
+        public static UITweenPropType Sanitize(UITweenPropType propType)
+        {
+            return (UITweenPropType)((byte)propType & ValidMask);
+        }
+
+        public static bool HasInvalidBits(UITweenPropType propType)
+        {
+            return ((byte)propType & ~ValidMask) != 0;
+        }
+    }
+
     [Serializable]
     public struct UITweenConfig
     {
