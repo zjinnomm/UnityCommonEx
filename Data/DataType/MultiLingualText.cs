@@ -14,7 +14,11 @@ namespace UnityCommonEx
         /// <summary>
         /// 运行时获取当前语言类型的委托，可由项目在初始化时设置（如从 HubbleBubbleSettings 读取）。
         /// </summary>
-        public static Func<LanguageType> GetLanguageType { get; set; }
+        public static Func<LanguageType> GetLanguageType
+        {
+            get => LanguageTypeEx.GetLanguageType;
+            set => LanguageTypeEx.GetLanguageType = value;
+        }
 
         internal Dictionary<LanguageType, string> _map = new Dictionary<LanguageType, string>();
 
@@ -30,7 +34,7 @@ namespace UnityCommonEx
         /// </summary>
         public string GetText()
         {
-            var lang = GetLanguageType != null ? GetLanguageType() : LanguageType.English;
+            var lang = LanguageTypeEx.GetCurrentLanguageType();
             if (_map.TryGetValue(lang, out var text))
                 return text;
             if (_map.TryGetValue(LanguageType.English, out var fallback))
