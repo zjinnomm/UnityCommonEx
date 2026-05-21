@@ -42,7 +42,7 @@ namespace UnityCommonEx
         EventTrigger.Entry skipPointerClickEntry;
 
         List<Image> CachedVeilMasks = new List<Image>();
-        List<TMP_Text> CachedTexts = new List<TMP_Text>();
+        List<TutorialTextUIController> CachedTexts = new List<TutorialTextUIController>();
         List<ActivatedEntry> ActivatedEntries = new List<ActivatedEntry>();
 
         protected override void OnInit()
@@ -109,7 +109,13 @@ namespace UnityCommonEx
 
         public void AddText(int key, Rect rect, string s)
         {
-            TMP_Text text = CreateOrReuseText();
+            TutorialTextUIController textController = CreateOrReuseText();
+            if (textController == null)
+            {
+                return;
+            }
+
+            TMP_Text text = textController.TextComponent;
             if (text == null)
             {
                 return;
@@ -117,34 +123,41 @@ namespace UnityCommonEx
 
             RectTransform root = GetComponent<RectTransform>();
             text.gameObject.SetActive(true);
-            text.rectTransform.anchoredPosition = new Vector2((rect.center.x - 0.5f) * root.rect.width, (rect.center.y - 0.5f) * root.rect.height);
-            text.rectTransform.sizeDelta = new Vector2(rect.size.x * root.rect.width, rect.size.y * root.rect.height);
+            textController.RectTransform.anchoredPosition = new Vector2((rect.center.x - 0.5f) * root.rect.width, (rect.center.y - 0.5f) * root.rect.height);
+            textController.RectTransform.sizeDelta = new Vector2(rect.size.x * root.rect.width, rect.size.y * root.rect.height);
+            text.horizontalAlignment = HorizontalAlignmentOptions.Center;
 
-            text.text = s;
+            textController.SetText(s);
             ActivatedEntries.Add(new ActivatedEntry{
                 Index = key,
                 Type = TutorialEntryType.Text,
-                RelatedComponent = text,
+                RelatedComponent = textController,
             });
         }
 
         public void AddTextNearRegion(int key, Rect rect, string s)
         {
-            TMP_Text text = CreateOrReuseText();
+            TutorialTextUIController textController = CreateOrReuseText();
+            if (textController == null)
+            {
+                return;
+            }
+
+            TMP_Text text = textController.TextComponent;
             if (text == null)
             {
                 return;
             }
 
-            text.gameObject.SetActive(true);
-            text.text = s;
-            PrepareTextLayout(text);
-            PositionTextNearRegion(text, rect);
+            textController.gameObject.SetActive(true);
+            textController.SetText(s);
+            PrepareTextLayout(textController);
+            PositionTextNearRegion(textController, rect);
 
             ActivatedEntries.Add(new ActivatedEntry{
                 Index = key,
                 Type = TutorialEntryType.Text,
-                RelatedComponent = text,
+                RelatedComponent = textController,
             });
         }
 
@@ -157,9 +170,9 @@ namespace UnityCommonEx
                 {
                     ActivatedEntries.RemoveAt(i);
                     Component component = entry.RelatedComponent;
-                    component?.gameObject.SetActive(false);
                     if (entry.Type == TutorialEntryType.Highlight)
                     {
+                        component?.gameObject.SetActive(false);
                         if (TutorialManager.Instance.MaskId > 0)
                         {
                             InteractionModel.RemoveExcludeRegion(TutorialManager.Instance.MaskId, key);
@@ -171,7 +184,12 @@ namespace UnityCommonEx
                     }
                     else if (entry.Type == TutorialEntryType.Text)
                     {
-                        CachedTexts.Add(component as TMP_Text);
+                        if (component is TutorialTextUIController textController)
+                        {
+                            textController.ClearText();
+                            textController.gameObject.SetActive(false);
+                            CachedTexts.Add(textController);
+                        }
                     }
                     return;
                 }
@@ -197,8 +215,14 @@ namespace UnityCommonEx
             return DisplayAlign.Bottom;
         }
 
-        void PositionTextNearRegion(TMP_Text text, Rect normalizedRect)
+        void PositionTextNearRegion(TutorialTextUIController textController, Rect normalizedRect)
         {
+            if (textController == null || textController.TextComponent == null)
+            {
+                return;
+            }
+
+            TMP_Text text = textController.TextComponent;
             RectTransform textRect = text.rectTransform;
             Canvas canvas = textRect.GetComponentInParent<Canvas>();
             RectTransform parentRect = textRect.parent as RectTransform;
@@ -220,11 +244,13 @@ namespace UnityCommonEx
             {
                 targetScreenPos.x = screenRect.xMin - TextPadding;
                 textRect.pivot = new Vector2(1f, 0.5f);
+                text.horizontalAlignment = HorizontalAlignmentOptions.Right;
             }
             else
             {
                 targetScreenPos.x = screenRect.xMax + TextPadding;
                 textRect.pivot = new Vector2(0f, 0.5f);
+                text.horizontalAlignment = HorizontalAlignmentOptions.Left;
             }
 
             if (align == DisplayAlign.Top)
@@ -243,12 +269,12 @@ namespace UnityCommonEx
             ClampToScreenEdges(textRect, parentRect, eventCam);
         }
 
-        TMP_Text CreateOrReuseText()
+        TutorialTextUIController CreateOrReuseText()
         {
             if (CachedTexts.Count != 0)
             {
                 int cachedIndex = CachedTexts.Count - 1;
-                TMP_Text text = CachedTexts[cachedIndex];
+                TutorialTextUIController text = CachedTexts[cachedIndex];
                 CachedTexts.RemoveAt(CachedTexts.Count - 1);
                 return text;
             }
@@ -259,7 +285,12 @@ namespace UnityCommonEx
                 return null;
             }
 
-            return Instantiate(TextPrefab, TextRoot).GetComponent<TMP_Text>();
+            TutorialTextUIController textController = Instantiate(TextPrefab, TextRoot).GetComponent<TutorialTextUIController>();
+            if (textController == null)
+            {
+                LogUtil.Error("TutorialUIController.TextPrefab must contain TutorialTextUIController.");
+            }
+            return textController;
         }
 
         void SetupSkipInteraction()
@@ -303,15 +334,17 @@ namespace UnityCommonEx
             TutorialManager.Instance?.SkipCurrentStage();
         }
 
-        void PrepareTextLayout(TMP_Text text)
+        void PrepareTextLayout(TutorialTextUIController textController)
         {
-            if (text == null)
+            if (textController == null || textController.TextComponent == null)
             {
                 return;
             }
+
+            TMP_Text text = textController.TextComponent;
             const float maxWidth = 420f;
             Vector2 preferred = text.GetPreferredValues(text.text, maxWidth, 0f);
-            text.rectTransform.sizeDelta = new Vector2(
+            textController.RectTransform.sizeDelta = new Vector2(
                 Mathf.Clamp(preferred.x + 24f, 120f, maxWidth),
                 Mathf.Max(preferred.y + 16f, 44f));
         }
