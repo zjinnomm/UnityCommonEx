@@ -16,12 +16,21 @@ namespace UnityCommonEx
 
     }
 
+    public class TutorialStage
+    {
+
+        [JsonProperty(Required = Required.Default)]
+        public TutorialEntry[] Entries;
+
+    }
+
     public class TutorialTemplate : BaseDataTemplate
     {
 
         [JsonProperty(Required = Required.Default)]
         public TutorialRect[] Rects;
-        public TutorialEntry[] Entries;
+        [JsonProperty(Required = Required.Default)]
+        public TutorialStage[] Stages;
         [JsonProperty(Required = Required.Default)]
         public float MaxDuration = -1;
         [JsonProperty(Required = Required.Default)]

@@ -13,7 +13,9 @@ namespace UnityCommonEx
 
         public struct ActivatedEntry
         {
-            public int Index;
+            public int Key;
+            public int StageIndex;
+            public int EntryIndex;
             public float ElapsedTime;
             public Rect Rect;
         }
@@ -24,10 +26,11 @@ namespace UnityCommonEx
         Dictionary<int, Rect> RectOverrides;
         Action OnTutorialEndCallback;
         bool PausedGameplay;
-        List<ActivatedEntry> ActivatedEntries = new List<ActivatedEntry>();
-        HashSet<int> ToBeDeactivatedIndexes = new HashSet<int>();
-        int NextEntryIndex = 0;
-        float ElapsedTime;
+        readonly List<ActivatedEntry> ActivatedEntries = new List<ActivatedEntry>();
+        readonly HashSet<int> ToBeDeactivatedKeys = new HashSet<int>();
+        int CurrentStageIndex;
+        int NextEntryIndex;
+        float StageElapsedTime;
 
         public void Initialize(Func<TutorialUIController> showFunc, Action hideFunc)
         {
@@ -37,9 +40,10 @@ namespace UnityCommonEx
             OnTutorialEndCallback = null;
             PausedGameplay = false;
             ActivatedEntries.Clear();
-            ToBeDeactivatedIndexes.Clear();
+            ToBeDeactivatedKeys.Clear();
+            CurrentStageIndex = 0;
             NextEntryIndex = 0;
-            ElapsedTime = 0;
+            StageElapsedTime = 0;
             ShowUIFunc = showFunc;
             HideUIFunc = hideFunc;
         }
@@ -50,87 +54,121 @@ namespace UnityCommonEx
 
         public void Tick(float delta)
         {
-            if (Tutorial == null || (ActivatedEntries.Count == 0 && ToBeDeactivatedIndexes.Count == 0 && NextEntryIndex >= Tutorial.Entries.Length))
+            if (Tutorial == null)
             {
                 EndTutorial();
                 return;
             }
-            bool blocked = false;
-            if (ActivatedEntries.Count > 0)
+
+            TutorialStage stage = GetCurrentStage();
+            if (stage == null)
             {
-                blocked = Tutorial.Entries[ActivatedEntries[ActivatedEntries.Count - 1].Index].IsBlocking;
+                EndTutorial();
+                return;
             }
 
-            if (!blocked)
+            StageElapsedTime += delta;
+            ActivateDueEntries(stage);
+            UpdateActivatedEntries(delta);
+            FlushPendingDeactivations();
+
+            while (Tutorial != null && IsCurrentStageComplete())
             {
-                ElapsedTime += delta;
-                while (NextEntryIndex < Tutorial.Entries.Length)
+                if (!AdvanceToNextStage())
                 {
-                    TutorialEntry entry = Tutorial.Entries[NextEntryIndex];
-                    if (ElapsedTime < entry.Delay)
-                    {
-                        break;
-                    }
-                    ActivateNext();
-                    blocked = entry.IsBlocking;
-                    if (blocked)
-                    {
-                        break;
-                    }
+                    EndTutorial();
+                    return;
                 }
             }
+        }
 
+        void ActivateDueEntries(TutorialStage stage)
+        {
+            TutorialEntry[] entries = stage?.Entries;
+            if (entries == null)
+            {
+                return;
+            }
+
+            while (NextEntryIndex < entries.Length)
+            {
+                TutorialEntry entry = entries[NextEntryIndex];
+                if (entry == null)
+                {
+                    NextEntryIndex++;
+                    continue;
+                }
+
+                if (StageElapsedTime < entry.Delay)
+                {
+                    break;
+                }
+
+                ActivateNext(stage);
+            }
+        }
+
+        void UpdateActivatedEntries(float delta)
+        {
             for (int i = 0; i < ActivatedEntries.Count; i++)
             {
                 ActivatedEntry record = ActivatedEntries[i];
                 record.ElapsedTime += delta;
-                TutorialEntry entry = Tutorial.Entries[record.Index];
-                entry.OnUpdate(delta, ref record);
+                TutorialEntry entry = GetEntry(record.StageIndex, record.EntryIndex);
+                entry?.OnUpdate(delta, ref record);
                 ActivatedEntries[i] = record;
-                if (entry.Duration > 0 && record.ElapsedTime >= entry.Duration)
+                if (entry != null && entry.Duration > 0 && record.ElapsedTime >= entry.Duration)
                 {
-                    Deactivate(record.Index);
+                    Deactivate(record.Key);
                 }
             }
-
-            foreach (var index in ToBeDeactivatedIndexes)
-            {
-                for (int i = 0; i < ActivatedEntries.Count; i++)
-                {
-                    ActivatedEntry record = ActivatedEntries[i];
-                    if (record.Index == index)
-                    {
-                        TutorialEntry entry = Tutorial.Entries[record.Index];
-                        entry.OnDeactivate(ref record);
-                        ActivatedEntries.RemoveAt(i);
-                        break;
-                    }
-                }
-            }
-            ToBeDeactivatedIndexes.Clear();
         }
 
-        public void ActivateNext()
+        void FlushPendingDeactivations()
         {
-            Rect rect = ResolveRect(Tutorial.Entries[NextEntryIndex]);
+            if (ToBeDeactivatedKeys.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = ActivatedEntries.Count - 1; i >= 0; i--)
+            {
+                ActivatedEntry record = ActivatedEntries[i];
+                if (!ToBeDeactivatedKeys.Contains(record.Key))
+                {
+                    continue;
+                }
+
+                TutorialEntry entry = GetEntry(record.StageIndex, record.EntryIndex);
+                entry?.OnDeactivate(ref record);
+                ActivatedEntries.RemoveAt(i);
+            }
+
+            ToBeDeactivatedKeys.Clear();
+        }
+
+        void ActivateNext(TutorialStage stage)
+        {
+            TutorialEntry entry = stage.Entries[NextEntryIndex];
             ActivatedEntry record = new ActivatedEntry {
-                Index = NextEntryIndex,
+                Key = ComposeEntryKey(CurrentStageIndex, NextEntryIndex),
+                StageIndex = CurrentStageIndex,
+                EntryIndex = NextEntryIndex,
                 ElapsedTime = 0,
-                Rect = rect,
+                Rect = ResolveRect(entry),
             };
-            TutorialEntry entry = Tutorial.Entries[NextEntryIndex];
             entry.OnActivate(ref record);
             ActivatedEntries.Add(record);
-            NextEntryIndex ++;
+            NextEntryIndex++;
         }
 
-        public void Deactivate(int index)
+        public void Deactivate(int key)
         {
             for (int i = 0; i < ActivatedEntries.Count; i++)
             {
-                if (ActivatedEntries[i].Index == index)
+                if (ActivatedEntries[i].Key == key)
                 {
-                    ToBeDeactivatedIndexes.Add(index);
+                    ToBeDeactivatedKeys.Add(key);
                     return;
                 }
             }
@@ -140,30 +178,97 @@ namespace UnityCommonEx
         {
             for (int i = 0; i < ActivatedEntries.Count; i++)
             {
-                ToBeDeactivatedIndexes.Add(ActivatedEntries[i].Index);
+                ToBeDeactivatedKeys.Add(ActivatedEntries[i].Key);
             }
         }
 
-        public bool SkipActiveEntries()
+        public bool SkipCurrentStage()
         {
-            if (Tutorial == null || ActivatedEntries.Count == 0)
+            if (Tutorial == null)
             {
                 return false;
             }
 
-            bool skipped = false;
-            for (int i = 0; i < ActivatedEntries.Count; i++)
+            if (!AdvanceToNextStage(forceSkip: true))
             {
-                ActivatedEntry record = ActivatedEntries[i];
-                TutorialEntry entry = Tutorial.Entries[record.Index];
-                if (entry != null && entry.CanSkip)
-                {
-                    ToBeDeactivatedIndexes.Add(record.Index);
-                    skipped = true;
-                }
+                EndTutorial();
+            }
+            return true;
+        }
+
+        bool AdvanceToNextStage(bool forceSkip = false)
+        {
+            TutorialStage[] stages = Tutorial?.Stages;
+            if (stages == null || CurrentStageIndex >= stages.Length)
+            {
+                return false;
             }
 
-            return skipped;
+            if (!forceSkip && !IsCurrentStageComplete())
+            {
+                return false;
+            }
+
+            ClearActivatedEntries();
+
+            CurrentStageIndex++;
+            NextEntryIndex = 0;
+            StageElapsedTime = 0;
+
+            return CurrentStageIndex < stages.Length;
+        }
+
+        void ClearActivatedEntries()
+        {
+            for (int i = ActivatedEntries.Count - 1; i >= 0; i--)
+            {
+                ActivatedEntry record = ActivatedEntries[i];
+                TutorialEntry entry = GetEntry(record.StageIndex, record.EntryIndex);
+                entry?.OnDeactivate(ref record);
+            }
+
+            ActivatedEntries.Clear();
+            ToBeDeactivatedKeys.Clear();
+        }
+
+        bool IsCurrentStageComplete()
+        {
+            TutorialStage stage = GetCurrentStage();
+            TutorialEntry[] entries = stage?.Entries;
+            return entries == null || (NextEntryIndex >= entries.Length && ActivatedEntries.Count == 0 && ToBeDeactivatedKeys.Count == 0);
+        }
+
+        TutorialStage GetCurrentStage()
+        {
+            TutorialStage[] stages = Tutorial?.Stages;
+            if (stages == null || CurrentStageIndex < 0 || CurrentStageIndex >= stages.Length)
+            {
+                return null;
+            }
+
+            return stages[CurrentStageIndex];
+        }
+
+        TutorialEntry GetEntry(int stageIndex, int entryIndex)
+        {
+            TutorialStage[] stages = Tutorial?.Stages;
+            if (stages == null || stageIndex < 0 || stageIndex >= stages.Length)
+            {
+                return null;
+            }
+
+            TutorialEntry[] entries = stages[stageIndex]?.Entries;
+            if (entries == null || entryIndex < 0 || entryIndex >= entries.Length)
+            {
+                return null;
+            }
+
+            return entries[entryIndex];
+        }
+
+        static int ComposeEntryKey(int stageIndex, int entryIndex)
+        {
+            return (stageIndex << 16) ^ entryIndex;
         }
 
         public void StartTutorial(TutorialTemplate tutorial, Action onTutorialEndCallback = null, Dictionary<int, Rect> rectOverrides = null)
@@ -177,13 +282,20 @@ namespace UnityCommonEx
             {
                 return;
             }
-            
+
+            TutorialStage[] stages = tutorial.Stages;
+            if (stages == null || stages.Length == 0)
+            {
+                return;
+            }
+
             Tutorial = tutorial;
             OnTutorialEndCallback = onTutorialEndCallback;
             RectOverrides = rectOverrides;
 
+            CurrentStageIndex = 0;
             NextEntryIndex = 0;
-            ElapsedTime = 0;
+            StageElapsedTime = 0;
 
             TutorialUIController ui = ShowUIFunc();
             if (ui == null)
@@ -266,7 +378,7 @@ namespace UnityCommonEx
         {
             StartTutorial(DataTemplateManager.Get<TutorialTemplate>(tutorial), rectSources, onTutorialEndCallback);
         }
-        
+
         public void EndTutorial()
         {
             TickingManager.Unregister(this);
@@ -286,14 +398,11 @@ namespace UnityCommonEx
             {
                 return;
             }
-            for (int i = 0; i < ActivatedEntries.Count; i++)
-            {
-                ActivatedEntry record = ActivatedEntries[i];
-                TutorialEntry entry = Tutorial.Entries[record.Index];
-                entry.OnDeactivate(ref record);
-            }
-            ActivatedEntries.Clear();
-            ToBeDeactivatedIndexes.Clear();
+
+            ClearActivatedEntries();
+            CurrentStageIndex = 0;
+            NextEntryIndex = 0;
+            StageElapsedTime = 0;
 
             OnTutorialEndCallback?.Invoke();
             OnTutorialEndCallback = null;

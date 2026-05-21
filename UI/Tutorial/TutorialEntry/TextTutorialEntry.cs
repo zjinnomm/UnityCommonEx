@@ -15,17 +15,17 @@ namespace UnityCommonEx
         {
             if (AutoPlace)
             {
-                TutorialUIController.Instance.AddTextNearRegion(record.Index, record.Rect, Text?.GetText() ?? string.Empty);
+                TutorialUIController.Instance.AddTextNearRegion(record.Key, record.Rect, Text?.GetText() ?? string.Empty);
             }
             else
             {
-                TutorialUIController.Instance.AddText(record.Index, record.Rect, Text?.GetText() ?? string.Empty);
+                TutorialUIController.Instance.AddText(record.Key, record.Rect, Text?.GetText() ?? string.Empty);
             }
         }
 
         public override void OnDeactivate(ref TutorialManager.ActivatedEntry record)
         {
-            TutorialUIController.Instance.RemoveObject(record.Index);
+            TutorialUIController.Instance.RemoveObject(record.Key);
         }
 
     }

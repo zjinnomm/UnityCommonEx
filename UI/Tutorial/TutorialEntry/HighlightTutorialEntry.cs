@@ -17,12 +17,12 @@ namespace UnityCommonEx
 
         public override void OnActivate(ref TutorialManager.ActivatedEntry record)
         {
-            TutorialUIController.Instance.AddVeilMask(record.Index, record.Rect, Shape);
+            TutorialUIController.Instance.AddVeilMask(record.Key, record.Rect, Shape);
         }
 
         public override void OnDeactivate(ref TutorialManager.ActivatedEntry record)
         {
-            TutorialUIController.Instance.RemoveObject(record.Index);
+            TutorialUIController.Instance.RemoveObject(record.Key);
         }
 
     }

@@ -300,7 +300,7 @@ namespace UnityCommonEx
 
         void OnSkipPointerClick()
         {
-            TutorialManager.Instance?.SkipActiveEntries();
+            TutorialManager.Instance?.SkipCurrentStage();
         }
 
         void PrepareTextLayout(TMP_Text text)

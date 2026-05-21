@@ -27,13 +27,6 @@ namespace UnityCommonEx
         public float Duration = -1;
         [JsonProperty(Required = Required.Default)]
         public int RectIndex = 0;
-        [JsonProperty(Required = Required.Default)]
-        public bool CanSkip = true;
-        [JsonProperty(Required = Required.Default)]
-        public bool Blocking = false;
-
-        [JsonIgnore]
-        public virtual bool IsBlocking => Blocking;
 
         public virtual void OnActivate(ref TutorialManager.ActivatedEntry record) { }
         public virtual void OnUpdate(float delta, ref TutorialManager.ActivatedEntry record) { }
