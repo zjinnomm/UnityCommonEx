@@ -5,6 +5,12 @@ using Newtonsoft.Json.Serialization;
 
 namespace UnityCommonEx
 {
+    public enum JsonReadFailureMode
+    {
+        Error,
+        Warning
+    }
+
     public static class JsonUtil
     {
 
@@ -26,9 +32,31 @@ namespace UnityCommonEx
             };
         }
 
-        public static T Read<T>(string path)
+        public static T Read<T>(string path, JsonReadFailureMode failureMode = JsonReadFailureMode.Error)
         {
-            return JsonConvert.DeserializeObject<T>(File.ReadAllText(path), defaultSettings);
+            try
+            {
+                return JsonConvert.DeserializeObject<T>(File.ReadAllText(path), defaultSettings);
+            }
+            catch (Exception ex)
+            {
+                if (failureMode == JsonReadFailureMode.Warning)
+                {
+                    LogUtil.Warn(
+                        "JsonUtil.Read failed for {0} at '{1}': {2}",
+                        typeof(T).Name,
+                        path,
+                        ex.Message);
+                    return default;
+                }
+
+                LogUtil.Error(
+                    "JsonUtil.Read failed for {0} at '{1}': {2}",
+                    typeof(T).Name,
+                    path,
+                    ex.Message);
+                return default;
+            }
         }
 
         public static T ReadRaw<T>(string content)

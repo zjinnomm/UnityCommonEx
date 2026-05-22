@@ -630,7 +630,8 @@ namespace UnityCommonEx
 
             try
             {
-                InputBindingOverrideProfile<TAction> profile = JsonUtil.Read<InputBindingOverrideProfile<TAction>>(overridePath);
+                InputBindingOverrideProfile<TAction> profile =
+                    JsonUtil.Read<InputBindingOverrideProfile<TAction>>(overridePath, JsonReadFailureMode.Warning);
                 if (profile?.Overrides == null)
                     return;
 

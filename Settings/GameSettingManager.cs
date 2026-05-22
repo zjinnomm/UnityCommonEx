@@ -98,7 +98,7 @@ namespace UnityCommonEx
 
                 if (System.IO.File.Exists(fullPath))
                 {
-                    _settings = JsonUtil.Read<T>(fullPath);
+                    _settings = JsonUtil.Read<T>(fullPath, JsonReadFailureMode.Warning);
                     if (_settings == null)
                     {
                         LogUtil.Warn("GameSettingManager: Failed to load settings, using default");
