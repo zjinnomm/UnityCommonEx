@@ -20,9 +20,19 @@ namespace UnityCommonEx
         [Tooltip("旋钮上的 Button；为空则在 Knob 上 GetComponent<Button>()")]
         public Button KnobButton;
 
+        [Tooltip("轨道图片；为空则在 Track 上 GetComponent<Image>()")]
+        public Image TrackImage;
+
+        [Tooltip("旋钮图片；为空则在 Knob 上 GetComponent<Image>()")]
+        public Image KnobImage;
+
         [Tooltip("旋钮与轨道左右端之间的留白")]
         [SerializeField]
         float endPadding = 6f;
+
+        [Tooltip("关闭或不可用时使用的颜色")]
+        [SerializeField]
+        Color offColor = new Color(0.78431374f, 0.78431374f, 0.78431374f, 1f);
 
         [SerializeField]
         bool m_IsOn;
@@ -43,7 +53,11 @@ namespace UnityCommonEx
             set
             {
                 if (KnobButton != null)
+                {
                     KnobButton.interactable = value;
+                }
+
+                ApplyVisualState();
             }
         }
 
@@ -53,8 +67,15 @@ namespace UnityCommonEx
                 Track = transform as RectTransform;
             if (KnobButton == null && Knob != null)
                 KnobButton = Knob.GetComponent<Button>();
+            if (TrackImage == null && Track != null)
+                TrackImage = Track.GetComponent<Image>();
+            if (KnobImage == null && Knob != null)
+                KnobImage = Knob.GetComponent<Image>();
             if (KnobButton != null)
+            {
+                KnobButton.transition = Selectable.Transition.None;
                 KnobButton.onClick.AddListener(OnKnobClicked);
+            }
         }
 
         void OnDestroy()
@@ -65,17 +86,17 @@ namespace UnityCommonEx
 
         void OnEnable()
         {
-            ApplyKnobPosition();
+            ApplyVisualState();
         }
 
         void Start()
         {
-            ApplyKnobPosition();
+            ApplyVisualState();
         }
 
         void OnRectTransformDimensionsChange()
         {
-            ApplyKnobPosition();
+            ApplyVisualState();
         }
 
         void OnKnobClicked()
@@ -92,13 +113,19 @@ namespace UnityCommonEx
         {
             if (m_IsOn == value)
             {
-                ApplyKnobPosition();
+                ApplyVisualState();
                 return;
             }
             m_IsOn = value;
-            ApplyKnobPosition();
+            ApplyVisualState();
             if (notify)
                 onValueChanged?.Invoke(m_IsOn);
+        }
+
+        void ApplyVisualState()
+        {
+            ApplyKnobPosition();
+            ApplyColors();
         }
 
         void ApplyKnobPosition()
@@ -115,11 +142,29 @@ namespace UnityCommonEx
             Knob.anchoredPosition = p;
         }
 
+        void ApplyColors()
+        {
+            bool isInteractable = interactable;
+
+            if (TrackImage != null)
+                TrackImage.color = isInteractable ? Color.white : offColor;
+
+            if (KnobImage != null)
+                KnobImage.color = !isInteractable || !m_IsOn ? offColor : Color.white;
+        }
+
 #if UNITY_EDITOR
         void OnValidate()
         {
             if (!Application.isPlaying)
-                ApplyKnobPosition();
+            {
+                if (TrackImage == null && Track != null)
+                    TrackImage = Track.GetComponent<Image>();
+                if (KnobImage == null && Knob != null)
+                    KnobImage = Knob.GetComponent<Image>();
+
+                ApplyVisualState();
+            }
         }
 #endif
     }
