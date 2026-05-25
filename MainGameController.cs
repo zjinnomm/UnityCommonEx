@@ -53,6 +53,7 @@ namespace UnityCommonEx
         {
             base.OnInit();
             LogUtil.Init();
+            TickingManager.Init();
 
             DataLoadMethodType dataLoadMethod;
             DataLoadMethodType configLoadMethod;

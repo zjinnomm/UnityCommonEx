@@ -14,6 +14,17 @@ namespace UnityCommonEx
         /// </summary>
         static bool isTicking = false;
 
+        /// <summary>
+        /// 初始化/重置 Tick 管理器，清空所有已注册与待处理项。
+        /// </summary>
+        public static void Init()
+        {
+            tickables.Clear();
+            toAdd.Clear();
+            toRemove.Clear();
+            isTicking = false;
+        }
+
         public static void Tick(float gameDelta, float uiDelta)
         {
             // 设置标志位：开始 Tick
