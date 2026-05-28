@@ -13,6 +13,9 @@ namespace UnityCommonEx
         public CachedStaticMethodRef OnChangedFunc;
 
         [JsonProperty(Required = Required.Default)]
+        public CachedStaticMethodRef InitFunc;
+
+        [JsonProperty(Required = Required.Default)]
         public bool ChangeImmediately = false;
 
         public static void RegisterTypeReflections()

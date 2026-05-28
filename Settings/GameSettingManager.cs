@@ -84,10 +84,13 @@ namespace UnityCommonEx
 
         public void Load()
         {
+            bool useInitialValues = false;
+
             if (string.IsNullOrEmpty(_savePath))
             {
                 LogUtil.Warn("GameSettingManager: SavePath is not set, using default settings");
                 _settings = new T();
+                ApplyInitialValues();
                 _committedSettings = CloneSettings(_settings);
                 return;
             }
@@ -103,12 +106,19 @@ namespace UnityCommonEx
                     {
                         LogUtil.Warn("GameSettingManager: Failed to load settings, using default");
                         _settings = new T();
+                        useInitialValues = true;
                     }
                 }
                 else
                 {
                     LogUtil.Info("GameSettingManager: Settings file not found, using default settings");
                     _settings = new T();
+                    useInitialValues = true;
+                }
+
+                if (useInitialValues)
+                {
+                    ApplyInitialValues();
                     Save();
                 }
 
@@ -118,6 +128,7 @@ namespace UnityCommonEx
             {
                 LogUtil.Error("GameSettingManager: Error loading settings: {0}", ex.Message);
                 _settings = new T();
+                ApplyInitialValues();
                 _committedSettings = CloneSettings(_settings);
             }
         }
@@ -342,6 +353,38 @@ namespace UnityCommonEx
             if (source == null)
                 return new T();
             return JsonUtil.ReadRaw<T>(JsonUtil.WriteRaw(source));
+        }
+
+        private void ApplyInitialValues()
+        {
+            GameSettingTemplate template = DataTemplateManager.Get<GameSettingTemplate>();
+            if (template == null)
+                return;
+
+            foreach (GameSettingFieldConfig fieldConfig in template.EnumerateFields())
+            {
+                if (fieldConfig?.InitFunc == null || string.IsNullOrEmpty(fieldConfig.InitFunc.Function))
+                    continue;
+
+                if (!_fieldCache.TryGetValue(fieldConfig.FieldName, out FieldInfo field))
+                    continue;
+
+                fieldConfig.InitFunc.Init(Type.EmptyTypes, field.FieldType, $"{typeof(T).Name}.{fieldConfig.FieldName}");
+                if (!fieldConfig.InitFunc.TryInvoke(Array.Empty<object>(), out object initialValue))
+                    continue;
+
+                try
+                {
+                    field.SetValue(_settings, ConvertValue(initialValue, field.FieldType));
+                }
+                catch (Exception ex)
+                {
+                    LogUtil.Error(
+                        "GameSettingManager: Error applying init func for field '{0}': {1}",
+                        fieldConfig.FieldName,
+                        ex.Message);
+                }
+            }
         }
     }
 }
