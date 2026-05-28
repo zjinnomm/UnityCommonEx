@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace UnityCommonEx
@@ -12,6 +11,7 @@ namespace UnityCommonEx
         public float SizeX;
         public float SizeY;
         public float Scale;
+        public Vector3 Rotation;
     }
 
     public class UITween : IPoolable
@@ -20,7 +20,7 @@ namespace UnityCommonEx
 
         public UITweenState StartState;
         public UITweenState TargetState;
-        
+
         public UITweenPropType PropType;
         public float Progress;
 
@@ -51,37 +51,32 @@ namespace UnityCommonEx
         void ApplyState(UITweenState state)
         {
             if (((byte)PropType & (byte)UITweenPropType.Position) > 0 && TargetTransform != null)
-            {
                 TargetTransform.anchoredPosition = state.Position;
-            }
+
             if (((byte)PropType & (byte)UITweenPropType.Alpha) > 0 && SetTargetAlphaFunc != null)
-            {
                 SetTargetAlphaFunc.Invoke(state.Alpha);
-            }
-            if (TargetTransform != null)
-            {
-                Vector2 sizeDelta = TargetTransform.sizeDelta;
-                if (((byte)PropType & (byte)UITweenPropType.SizeX) > 0)
-                {
-                    sizeDelta.x = state.SizeX;
-                }
-                if (((byte)PropType & (byte)UITweenPropType.SizeY) > 0)
-                {
-                    sizeDelta.y = state.SizeY;
-                }
-                TargetTransform.sizeDelta = sizeDelta;
-                if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
-                {
-                    TargetTransform.localScale = new Vector3(state.Scale, state.Scale, state.Scale);
-                }
-            }
+
+            if (TargetTransform == null)
+                return;
+
+            Vector2 sizeDelta = TargetTransform.sizeDelta;
+            if (((byte)PropType & (byte)UITweenPropType.SizeX) > 0)
+                sizeDelta.x = state.SizeX;
+            if (((byte)PropType & (byte)UITweenPropType.SizeY) > 0)
+                sizeDelta.y = state.SizeY;
+            TargetTransform.sizeDelta = sizeDelta;
+
+            if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
+                TargetTransform.localScale = new Vector3(state.Scale, state.Scale, state.Scale);
+
+            if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
+                TargetTransform.localEulerAngles = state.Rotation;
         }
 
         public void PrepareTween()
         {
             Progress = 0;
-            
-            // 设置起始值和目标值（从 Min 到 Max）
+
             if (((byte)PropType & (byte)UITweenPropType.Position) > 0)
             {
                 StartState.Position = Config.MinPos;
@@ -107,112 +102,51 @@ namespace UnityCommonEx
                 StartState.Scale = Config.MinScale;
                 TargetState.Scale = Config.MaxScale;
             }
-            
-            // 第一次 Tick 前，通过曲线初端（t=0）设置初始状态
+            if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
+            {
+                StartState.Rotation = Config.MinRot;
+                TargetState.Rotation = Config.MaxRot;
+            }
+
             ApplyInitialState();
         }
-        
+
         void ApplyInitialState()
         {
-            UITweenState initialState = new UITweenState();
-            
-            // 获取当前位置、Alpha 和 Size（用于不参与动画的属性）
-            if (TargetTransform != null)
-            {
-                initialState.Position = TargetTransform.anchoredPosition;
-                initialState.SizeX = TargetTransform.sizeDelta.x;
-                initialState.SizeY = TargetTransform.sizeDelta.y;
-                initialState.Scale = TargetTransform.localScale.x;
-            }
-            if (GetTargetAlphaFunc != null)
-            {
-                initialState.Alpha = GetTargetAlphaFunc();
-            }
-            
-            // 根据 PropType 和曲线初端（t=0）设置初始值
+            UITweenState initialState = GetCurrentState();
+
             if (((byte)PropType & (byte)UITweenPropType.Position) > 0)
-            {
-                Vector2 pos = Config.MinPos;
-                if (Config.PosXCurve != null && Config.PosXCurve.length > 0)
-                {
-                    float curveValue = Config.PosXCurve.Evaluate(0f);
-                    pos.x = Mathf.Lerp(Config.MinPos.x, Config.MaxPos.x, curveValue);
-                }
-                if (Config.PosYCurve != null && Config.PosYCurve.length > 0)
-                {
-                    float curveValue = Config.PosYCurve.Evaluate(0f);
-                    pos.y = Mathf.Lerp(Config.MinPos.y, Config.MaxPos.y, curveValue);
-                }
-                initialState.Position = pos;
-            }
+                initialState.Position = EvaluatePosition(0f, Config.MinPos, Config.MaxPos);
             if (((byte)PropType & (byte)UITweenPropType.Alpha) > 0)
-            {
-                float alpha = Config.MinAlpha;
-                if (Config.AlphaCurve != null && Config.AlphaCurve.length > 0)
-                {
-                    float curveValue = Config.AlphaCurve.Evaluate(0f);
-                    alpha = Mathf.Lerp(Config.MinAlpha, Config.MaxAlpha, curveValue);
-                }
-                initialState.Alpha = alpha;
-            }
+                initialState.Alpha = EvaluateScalar(0f, Config.MinAlpha, Config.MaxAlpha, Config.AlphaCurve);
             if (((byte)PropType & (byte)UITweenPropType.SizeX) > 0)
-            {
-                float sizeX = Config.MinSizeX;
-                if (Config.SizeXCurve != null && Config.SizeXCurve.length > 0)
-                {
-                    float curveValue = Config.SizeXCurve.Evaluate(0f);
-                    sizeX = Mathf.Lerp(Config.MinSizeX, Config.MaxSizeX, curveValue);
-                }
-                initialState.SizeX = sizeX;
-            }
+                initialState.SizeX = EvaluateScalar(0f, Config.MinSizeX, Config.MaxSizeX, Config.SizeXCurve);
             if (((byte)PropType & (byte)UITweenPropType.SizeY) > 0)
-            {
-                float sizeY = Config.MinSizeY;
-                if (Config.SizeYCurve != null && Config.SizeYCurve.length > 0)
-                {
-                    float curveValue = Config.SizeYCurve.Evaluate(0f);
-                    sizeY = Mathf.Lerp(Config.MinSizeY, Config.MaxSizeY, curveValue);
-                }
-                initialState.SizeY = sizeY;
-            }
+                initialState.SizeY = EvaluateScalar(0f, Config.MinSizeY, Config.MaxSizeY, Config.SizeYCurve);
             if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
-            {
-                float scale = Config.MinScale;
-                if (Config.ScaleCurve != null && Config.ScaleCurve.length > 0)
-                {
-                    float curveValue = Config.ScaleCurve.Evaluate(0f);
-                    scale = Mathf.Lerp(Config.MinScale, Config.MaxScale, curveValue);
-                }
-                initialState.Scale = scale;
-            }
-            
+                initialState.Scale = EvaluateScalar(0f, Config.MinScale, Config.MaxScale, Config.ScaleCurve);
+            if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
+                initialState.Rotation = EvaluateRotation(0f, Config.MinRot, Config.MaxRot);
+
             ApplyState(initialState);
         }
 
-        // return tween finished
         public bool TickTween(float delta)
         {
             if (LoopTimes == 0 || TargetTransform == null || !IsActive)
-            {
                 return true;
-            }
-            
+
             if (Progress == 0)
-            {
                 PrepareTween();
-            }
-            
+
             Progress += delta;
-            
+
             float duration = GetDuration();
             if (duration <= 0)
-            {
-                duration = 1f; // Default duration if no curves
-            }
-            
+                duration = 1f;
+
             if (Progress >= duration)
             {
-                // Apply final state
                 ApplyFinalState();
                 LoopTimes--;
                 if (LoopTimes > 0)
@@ -234,194 +168,107 @@ namespace UnityCommonEx
 
         void ApplyFinalState()
         {
-            // 通过曲线末端（t=1）设置最终状态
-            UITweenState finalState = new UITweenState();
-            
-            // 获取当前位置、Alpha 和 Size（用于不参与动画的属性）
-            if (TargetTransform != null)
-            {
-                finalState.Position = TargetTransform.anchoredPosition;
-                finalState.SizeX = TargetTransform.sizeDelta.x;
-                finalState.SizeY = TargetTransform.sizeDelta.y;
-                finalState.Scale = TargetTransform.localScale.x;
-            }
-            if (GetTargetAlphaFunc != null)
-            {
-                finalState.Alpha = GetTargetAlphaFunc();
-            }
-            
-            // 根据 PropType 和曲线末端（t=1）设置最终值
+            UITweenState finalState = GetCurrentState();
+
             if (((byte)PropType & (byte)UITweenPropType.Position) > 0)
-            {
-                Vector2 pos = Config.MaxPos;
-                if (Config.PosXCurve != null && Config.PosXCurve.length > 0)
-                {
-                    float curveValue = Config.PosXCurve.Evaluate(1f);
-                    pos.x = Mathf.Lerp(Config.MinPos.x, Config.MaxPos.x, curveValue);
-                }
-                if (Config.PosYCurve != null && Config.PosYCurve.length > 0)
-                {
-                    float curveValue = Config.PosYCurve.Evaluate(1f);
-                    pos.y = Mathf.Lerp(Config.MinPos.y, Config.MaxPos.y, curveValue);
-                }
-                finalState.Position = pos;
-            }
+                finalState.Position = EvaluatePosition(1f, Config.MinPos, Config.MaxPos);
             if (((byte)PropType & (byte)UITweenPropType.Alpha) > 0)
-            {
-                float alpha = Config.MaxAlpha;
-                if (Config.AlphaCurve != null && Config.AlphaCurve.length > 0)
-                {
-                    float curveValue = Config.AlphaCurve.Evaluate(1f);
-                    alpha = Mathf.Lerp(Config.MinAlpha, Config.MaxAlpha, curveValue);
-                }
-                finalState.Alpha = alpha;
-            }
+                finalState.Alpha = EvaluateScalar(1f, Config.MinAlpha, Config.MaxAlpha, Config.AlphaCurve);
             if (((byte)PropType & (byte)UITweenPropType.SizeX) > 0)
-            {
-                float sizeX = Config.MaxSizeX;
-                if (Config.SizeXCurve != null && Config.SizeXCurve.length > 0)
-                {
-                    float curveValue = Config.SizeXCurve.Evaluate(1f);
-                    sizeX = Mathf.Lerp(Config.MinSizeX, Config.MaxSizeX, curveValue);
-                }
-                finalState.SizeX = sizeX;
-            }
+                finalState.SizeX = EvaluateScalar(1f, Config.MinSizeX, Config.MaxSizeX, Config.SizeXCurve);
             if (((byte)PropType & (byte)UITweenPropType.SizeY) > 0)
-            {
-                float sizeY = Config.MaxSizeY;
-                if (Config.SizeYCurve != null && Config.SizeYCurve.length > 0)
-                {
-                    float curveValue = Config.SizeYCurve.Evaluate(1f);
-                    sizeY = Mathf.Lerp(Config.MinSizeY, Config.MaxSizeY, curveValue);
-                }
-                finalState.SizeY = sizeY;
-            }
+                finalState.SizeY = EvaluateScalar(1f, Config.MinSizeY, Config.MaxSizeY, Config.SizeYCurve);
             if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
-            {
-                float scale = Config.MaxScale;
-                if (Config.ScaleCurve != null && Config.ScaleCurve.length > 0)
-                {
-                    float curveValue = Config.ScaleCurve.Evaluate(1f);
-                    scale = Mathf.Lerp(Config.MinScale, Config.MaxScale, curveValue);
-                }
-                finalState.Scale = scale;
-            }
-            
+                finalState.Scale = EvaluateScalar(1f, Config.MinScale, Config.MaxScale, Config.ScaleCurve);
+            if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
+                finalState.Rotation = EvaluateRotation(1f, Config.MinRot, Config.MaxRot);
+
             ApplyState(finalState);
         }
 
         public void ApplyStateWithCurves(float currentProgress)
         {
             UITweenState state = new UITweenState();
-            
-            // 使用 Config.Duration（曲线时间范围是 0-1，相对于 Duration 归一化）
             float duration = GetDuration();
-            
-            // Normalize progress to 0-1 for curve evaluation（曲线时间范围是 0-1）
             float normalizedT = duration > 0 ? Mathf.Clamp01(currentProgress / duration) : 1f;
-            
+
             if (((byte)PropType & (byte)UITweenPropType.Position) > 0)
-            {
-                Vector2 pos = StartState.Position;
-                if (Config.PosXCurve != null && Config.PosXCurve.length > 0)
-                {
-                    // Evaluate curve at normalized time, curve value is interpolation factor (0-1)
-                    float curveValue = Config.PosXCurve.Evaluate(normalizedT);
-                    pos.x = Mathf.Lerp(StartState.Position.x, TargetState.Position.x, curveValue);
-                }
-                else
-                {
-                    pos.x = Mathf.Lerp(StartState.Position.x, TargetState.Position.x, normalizedT);
-                }
-                if (Config.PosYCurve != null && Config.PosYCurve.length > 0)
-                {
-                    float curveValue = Config.PosYCurve.Evaluate(normalizedT);
-                    pos.y = Mathf.Lerp(StartState.Position.y, TargetState.Position.y, curveValue);
-                }
-                else
-                {
-                    pos.y = Mathf.Lerp(StartState.Position.y, TargetState.Position.y, normalizedT);
-                }
-                state.Position = pos;
-            }
+                state.Position = EvaluatePosition(normalizedT, StartState.Position, TargetState.Position);
             if (((byte)PropType & (byte)UITweenPropType.Alpha) > 0)
-            {
-                if (Config.AlphaCurve != null && Config.AlphaCurve.length > 0)
-                {
-                    float curveValue = Config.AlphaCurve.Evaluate(normalizedT);
-                    state.Alpha = Mathf.Lerp(StartState.Alpha, TargetState.Alpha, curveValue);
-                }
-                else
-                {
-                    state.Alpha = Mathf.Lerp(StartState.Alpha, TargetState.Alpha, normalizedT);
-                }
-            }
+                state.Alpha = EvaluateScalar(normalizedT, StartState.Alpha, TargetState.Alpha, Config.AlphaCurve);
             if (((byte)PropType & (byte)UITweenPropType.SizeX) > 0)
-            {
-                if (Config.SizeXCurve != null && Config.SizeXCurve.length > 0)
-                {
-                    float curveValue = Config.SizeXCurve.Evaluate(normalizedT);
-                    state.SizeX = Mathf.Lerp(StartState.SizeX, TargetState.SizeX, curveValue);
-                }
-                else
-                {
-                    state.SizeX = Mathf.Lerp(StartState.SizeX, TargetState.SizeX, normalizedT);
-                }
-            }
+                state.SizeX = EvaluateScalar(normalizedT, StartState.SizeX, TargetState.SizeX, Config.SizeXCurve);
             if (((byte)PropType & (byte)UITweenPropType.SizeY) > 0)
-            {
-                if (Config.SizeYCurve != null && Config.SizeYCurve.length > 0)
-                {
-                    float curveValue = Config.SizeYCurve.Evaluate(normalizedT);
-                    state.SizeY = Mathf.Lerp(StartState.SizeY, TargetState.SizeY, curveValue);
-                }
-                else
-                {
-                    state.SizeY = Mathf.Lerp(StartState.SizeY, TargetState.SizeY, normalizedT);
-                }
-            }
+                state.SizeY = EvaluateScalar(normalizedT, StartState.SizeY, TargetState.SizeY, Config.SizeYCurve);
             if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
-            {
-                if (Config.ScaleCurve != null && Config.ScaleCurve.length > 0)
-                {
-                    float curveValue = Config.ScaleCurve.Evaluate(normalizedT);
-                    state.Scale = Mathf.Lerp(StartState.Scale, TargetState.Scale, curveValue);
-                }
-                else
-                {
-                    state.Scale = Mathf.Lerp(StartState.Scale, TargetState.Scale, normalizedT);
-                }
-            }
-            
+                state.Scale = EvaluateScalar(normalizedT, StartState.Scale, TargetState.Scale, Config.ScaleCurve);
+            if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
+                state.Rotation = EvaluateRotation(normalizedT, StartState.Rotation, TargetState.Rotation);
+
             ApplyState(state);
         }
 
         public float GetDuration()
         {
-            // 直接使用 Config.Duration（曲线时间范围是 0-1，相对于 Duration 归一化）
             if (Config.Duration > 0)
-            {
                 return Config.Duration;
-            }
-            return 1f; // Default duration if not set
+            return 1f;
         }
-        
-        /// <summary>
-        /// 获取当前进度（0-1）
-        /// </summary>
+
         public float GetProgress()
         {
             float duration = GetDuration();
             if (duration > 0)
-            {
                 return Mathf.Clamp01(Progress / duration);
-            }
-            return 1f; // 如果 duration <= 0，返回 1（已完成）
+            return 1f;
         }
 
         public void ToLastFrame()
         {
             ApplyFinalState();
+        }
+
+        private UITweenState GetCurrentState()
+        {
+            UITweenState state = new UITweenState();
+            if (TargetTransform != null)
+            {
+                state.Position = TargetTransform.anchoredPosition;
+                state.SizeX = TargetTransform.sizeDelta.x;
+                state.SizeY = TargetTransform.sizeDelta.y;
+                state.Scale = TargetTransform.localScale.x;
+                state.Rotation = TargetTransform.localEulerAngles;
+            }
+            if (GetTargetAlphaFunc != null)
+                state.Alpha = GetTargetAlphaFunc();
+            return state;
+        }
+
+        private Vector2 EvaluatePosition(float normalizedT, Vector2 start, Vector2 target)
+        {
+            Vector2 pos = start;
+            pos.x = EvaluateScalar(normalizedT, start.x, target.x, Config.PosXCurve);
+            pos.y = EvaluateScalar(normalizedT, start.y, target.y, Config.PosYCurve);
+            return pos;
+        }
+
+        private Vector3 EvaluateRotation(float normalizedT, Vector3 start, Vector3 target)
+        {
+            Vector3 rotation = start;
+            rotation.x = EvaluateScalar(normalizedT, start.x, target.x, Config.RotXCurve);
+            rotation.y = EvaluateScalar(normalizedT, start.y, target.y, Config.RotYCurve);
+            rotation.z = EvaluateScalar(normalizedT, start.z, target.z, Config.RotZCurve);
+            return rotation;
+        }
+
+        private static float EvaluateScalar(float normalizedT, float start, float target, AnimationCurve curve)
+        {
+            if (curve != null && curve.length > 0)
+            {
+                float curveValue = curve.Evaluate(normalizedT);
+                return Mathf.Lerp(start, target, curveValue);
+            }
+            return Mathf.Lerp(start, target, normalizedT);
         }
     }
 

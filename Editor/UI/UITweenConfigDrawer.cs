@@ -16,14 +16,14 @@ namespace UnityCommonEx
             EditorGUI.BeginProperty(position, label, property);
             float labelWidth = EditorGUIUtility.labelWidth;
             EditorGUIUtility.labelWidth = 100;
-            
+
             position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
             position.height = UnitPropHeight;
-            
+
             var propType = property.FindPropertyRelative("PropType");
-            propType.enumValueFlag = Convert.ToInt32(EditorGUI.EnumFlagsField(position, "Tween Props", (UITweenPropType) propType.enumValueFlag));
+            propType.enumValueFlag = Convert.ToInt32(EditorGUI.EnumFlagsField(position, "Tween Props", (UITweenPropType)propType.enumValueFlag));
             position.y += UnitPropHeight + UnitPropMargin;
-            
+
             EditorGUI.PropertyField(position, property.FindPropertyRelative("Duration"));
             position.y += UnitPropHeight + UnitPropMargin;
 
@@ -74,35 +74,40 @@ namespace UnityCommonEx
                 EditorGUI.PropertyField(position, property.FindPropertyRelative("ScaleCurve"));
                 position.y += UnitPropHeight + UnitPropMargin;
             }
-            
+            if ((propType.enumValueFlag & (byte)UITweenPropType.Rotation) > 0)
+            {
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("MinRot"));
+                position.y += UnitPropHeight + UnitPropMargin;
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("MaxRot"));
+                position.y += UnitPropHeight + UnitPropMargin;
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("RotXCurve"));
+                position.y += UnitPropHeight + UnitPropMargin;
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("RotYCurve"));
+                position.y += UnitPropHeight + UnitPropMargin;
+                EditorGUI.PropertyField(position, property.FindPropertyRelative("RotZCurve"));
+                position.y += UnitPropHeight + UnitPropMargin;
+            }
+
             EditorGUIUtility.labelWidth = labelWidth;
             EditorGUI.EndProperty();
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            int prop = 2; // PropType, Duration
+            int prop = 2;
             int propType = property.FindPropertyRelative("PropType").enumValueFlag;
             if ((propType & (byte)UITweenPropType.Position) > 0)
-            {
-                prop += 4; // MinPos, MaxPos, PosXCurve, PosYCurve
-            }
+                prop += 4;
             if ((propType & (byte)UITweenPropType.Alpha) > 0)
-            {
-                prop += 3; // MinAlpha, MaxAlpha, AlphaCurve
-            }
+                prop += 3;
             if ((propType & (byte)UITweenPropType.SizeX) > 0)
-            {
-                prop += 3; // MinSizeX, MaxSizeX, SizeXCurve
-            }
+                prop += 3;
             if ((propType & (byte)UITweenPropType.SizeY) > 0)
-            {
-                prop += 3; // MinSizeY, MaxSizeY, SizeYCurve
-            }
+                prop += 3;
             if ((propType & (byte)UITweenPropType.Scale) > 0)
-            {
-                prop += 3; // MinScale, MaxScale, ScaleCurve
-            }
+                prop += 3;
+            if ((propType & (byte)UITweenPropType.Rotation) > 0)
+                prop += 5;
             return prop * (UnitPropHeight + UnitPropMargin) - UnitPropMargin;
         }
 
