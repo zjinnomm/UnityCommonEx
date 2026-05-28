@@ -14,6 +14,15 @@ namespace UnityCommonEx
 
         public TickType GetTickType() => TickType.UI;
 
+        public void OnTickStopped()
+        {
+            for (int i = Tweens.Count - 1; i >= 0; i--)
+            {
+                InstancePool<UITween>.Instance.ReturnInstance(Tweens[i]);
+            }
+            Tweens.Clear();
+        }
+
         public void Tick(float delta)
         {
             for (int i = Tweens.Count - 1; i >= 0; i--)

@@ -15,5 +15,7 @@
 
         TickType GetTickType();
 
+        void OnTickStopped();
+
     }
 }

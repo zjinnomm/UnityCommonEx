@@ -52,6 +52,11 @@ namespace UnityCommonEx
 
         public TickType GetTickType() => TickType.UI;
 
+        public void OnTickStopped()
+        {
+            EndTutorial();
+        }
+
         public void Tick(float delta)
         {
             if (Tutorial == null)
