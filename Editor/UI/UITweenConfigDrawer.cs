@@ -10,6 +10,7 @@ namespace UnityCommonEx
 
         const float UnitPropHeight = 18;
         const float UnitPropMargin = 2;
+        const float FoldoutWidth = 18;
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
@@ -21,7 +22,19 @@ namespace UnityCommonEx
             position.height = UnitPropHeight;
 
             var propType = property.FindPropertyRelative("PropType");
-            propType.enumValueFlag = Convert.ToInt32(EditorGUI.EnumFlagsField(position, "Tween Props", (UITweenPropType)propType.enumValueFlag));
+            Rect propTypeRect = new Rect(position.x, position.y, position.width - FoldoutWidth - UnitPropMargin, position.height);
+            Rect foldoutRect = new Rect(propTypeRect.xMax + UnitPropMargin, position.y, FoldoutWidth, position.height);
+
+            propType.enumValueFlag = Convert.ToInt32(EditorGUI.EnumFlagsField(propTypeRect, "Type Mask", (UITweenPropType)propType.enumValueFlag));
+            property.isExpanded = EditorGUI.Foldout(foldoutRect, property.isExpanded, GUIContent.none, true);
+
+            if (!property.isExpanded)
+            {
+                EditorGUIUtility.labelWidth = labelWidth;
+                EditorGUI.EndProperty();
+                return;
+            }
+
             position.y += UnitPropHeight + UnitPropMargin;
 
             EditorGUI.PropertyField(position, property.FindPropertyRelative("Duration"));
@@ -94,6 +107,9 @@ namespace UnityCommonEx
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
+            if (!property.isExpanded)
+                return UnitPropHeight;
+
             int prop = 2;
             int propType = property.FindPropertyRelative("PropType").enumValueFlag;
             if ((propType & (byte)UITweenPropType.Position) > 0)
