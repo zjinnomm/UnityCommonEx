@@ -198,11 +198,9 @@ namespace UnityCommonEx
 
         DisplaySide DetermineDisplaySide(Rect screenRect, Vector2 textScreenPixelSize)
         {
-            if (screenRect.x > textScreenPixelSize.x + TextPadding)
-            {
-                return DisplaySide.Left;
-            }
-            return DisplaySide.Right;
+            return screenRect.center.x >= Screen.width * 0.5f
+                ? DisplaySide.Left
+                : DisplaySide.Right;
         }
 
         DisplayAlign DetermineDisplayAlign(Rect screenRect, Vector2 textScreenPixelSize)
