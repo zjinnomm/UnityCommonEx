@@ -10,7 +10,7 @@ namespace UnityCommonEx
     /// 模板由参数列表与返回类型决定，通过 Init 传入。
     /// </summary>
     [JsonConverter(typeof(CachedStaticMethodRefConverter))]
-    public class CachedStaticMethodRef
+    public class CachedStaticMethodRef : IDataTableStringField
     {
         /// <summary>
         /// 函数名（格式 ClassName.MethodName），仅由 JSON 从 string 反序列化得到。
@@ -112,6 +112,11 @@ namespace UnityCommonEx
                 return true;
             }
             return false;
+        }
+
+        public void SetFromString(string value)
+        {
+            Function = value;
         }
     }
 

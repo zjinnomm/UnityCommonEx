@@ -20,7 +20,7 @@ namespace UnityCommonEx
 
     }
 
-    public interface ILevelDataTemplateReference
+    public interface ILevelDataTemplateReference : IDataTableStringField
     {
         public string Id { set; get; }
         public int Level { set; get; }
@@ -94,6 +94,13 @@ namespace UnityCommonEx
             this.id = id;
             this.level = level;
             cachedResolved = null;
+        }
+
+        public void SetFromString(string value)
+        {
+            string[] split = value.Split(":");
+            Id = split[0];
+            Level = split.Length > 1 ? int.Parse(split[1]) : 0;
         }
 
     }

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 namespace UnityCommonEx
 {
 
-    public interface IDataTableReference
+    public interface IDataTableReference : IDataTableStringField
     {
         public string Id { set; get; }
 
@@ -62,6 +62,11 @@ namespace UnityCommonEx
         [NonSerialized]
         DataTable<TK, TR> cachedResolved;
 
+        public void SetFromString(string value)
+        {
+            Id = value;
+        }
+
     }
 
     public class DataTableReferenceConverter : JsonConverter
@@ -90,7 +95,7 @@ namespace UnityCommonEx
         public TK RowId { get; set; }
     }
 
-    public interface IDataTableRowReference
+    public interface IDataTableRowReference : IDataTableStringField
     {
 
     }
@@ -181,6 +186,38 @@ namespace UnityCommonEx
         [NonSerialized]
         TR cachedResolved;
         DataTable<TK, TR> cachedResolvedTable;
+
+        public void SetFromString(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+            {
+                TableId = null;
+                RowId = default;
+                return;
+            }
+
+            if (input.Contains(":"))
+            {
+                string[] parts = input.Split(':', 2);
+                TableId = parts[0];
+                RowId = (TK)ConvertStringToType(parts[1], typeof(TK));
+                return;
+            }
+
+            TableId = null;
+            RowId = (TK)ConvertStringToType(input, typeof(TK));
+        }
+
+        static object ConvertStringToType(string input, Type targetType)
+        {
+            if (targetType == typeof(int))
+                return int.Parse(input);
+            if (targetType == typeof(string))
+                return input;
+            if (targetType == typeof(long))
+                return long.Parse(input);
+            throw new NotSupportedException($"Unsupported type: {targetType}");
+        }
     }
 
     public class DataTableRowReferenceConverter : JsonConverter

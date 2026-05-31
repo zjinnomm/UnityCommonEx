@@ -5,7 +5,7 @@ using Unity.VisualScripting;
 namespace UnityCommonEx
 {
 
-    public interface IDataTemplateReference
+    public interface IDataTemplateReference : IDataTableStringField
     {
         public string Id { set; get; }
     }
@@ -74,6 +74,11 @@ namespace UnityCommonEx
         {
             this.id = id;
             cachedResolved = null;
+        }
+
+        public void SetFromString(string value)
+        {
+            Id = value;
         }
 
     }

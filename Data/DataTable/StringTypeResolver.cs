@@ -44,32 +44,12 @@ namespace UnityCommonEx
             {
                 return (s) => IntRange.FromString(s);
             }
-            if (typeof(ILevelDataTemplateReference).IsAssignableFrom(type))
-            {
-                return (s) =>
-                {
-                    ILevelDataTemplateReference result = Activator.CreateInstance(type) as ILevelDataTemplateReference;
-                    string[] split = s.Split(":");
-                    result.Id = split[0];
-                    result.Level = split.Length > 1 ? int.Parse(split[1]) : 0;
-                    return result;
-                };
-            }
-            if (typeof(IDataTableReference).IsAssignableFrom(type))
+            if (typeof(IDataTableStringField).IsAssignableFrom(type))
             {
                 return (s) =>
                 {
                     object result = Activator.CreateInstance(type);
-                    ((IDataTableReference)result).Id = s;
-                    return result;
-                };
-            }
-            if (typeof(IDataTemplateReference).IsAssignableFrom(type))
-            {
-                return (s) =>
-                {
-                    object result = Activator.CreateInstance(type);
-                    ((IDataTemplateReference)result).Id = s;
+                    ((IDataTableStringField)result).SetFromString(s);
                     return result;
                 };
             }
