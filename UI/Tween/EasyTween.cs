@@ -19,6 +19,16 @@ namespace UnityCommonEx
 
         private uint _tweenId;
 
+        private void OnEnable()
+        {
+            StartLoopTween();
+        }
+
+        private void OnDisable()
+        {
+            StopLoopTween();
+        }
+
         protected override void OnActivate()
         {
             base.OnActivate();
@@ -34,9 +44,12 @@ namespace UnityCommonEx
         private void StartLoopTween()
         {
             if (Tween.PropType == 0) return;
+            if (!isActiveAndEnabled) return;
 
             RectTransform target = TweenTarget != null ? TweenTarget : transform as RectTransform;
             if (target == null) return;
+
+            StopLoopTween();
 
             var tweenObj = new UITweenObject
             {
