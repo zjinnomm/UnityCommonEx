@@ -67,7 +67,10 @@ namespace UnityCommonEx
             TargetTransform.sizeDelta = sizeDelta;
 
             if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
-                TargetTransform.localScale = new Vector3(state.Scale, state.Scale, state.Scale);
+            {
+                float scale = SanitizeScale(state.Scale, TargetTransform.localScale.x);
+                TargetTransform.localScale = new Vector3(scale, scale, scale);
+            }
 
             if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
                 TargetTransform.localEulerAngles = state.Rotation;
@@ -269,6 +272,20 @@ namespace UnityCommonEx
                 return Mathf.Lerp(start, target, curveValue);
             }
             return Mathf.Lerp(start, target, normalizedT);
+        }
+
+        private static float SanitizeScale(float candidate, float fallback)
+        {
+            if (IsFinite(candidate))
+                return candidate;
+            if (IsFinite(fallback))
+                return fallback;
+            return 1f;
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 
