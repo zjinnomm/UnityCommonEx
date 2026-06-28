@@ -36,7 +36,7 @@ namespace UnityCommonEx
         {
             try
             {
-                return JsonConvert.DeserializeObject<T>(File.ReadAllText(path), defaultSettings);
+                return JsonConvert.DeserializeObject<T>(NormalizeJsonContent(File.ReadAllText(path)), defaultSettings);
             }
             catch (Exception ex)
             {
@@ -61,7 +61,7 @@ namespace UnityCommonEx
 
         public static T ReadRaw<T>(string content)
         {
-            return JsonConvert.DeserializeObject<T>(content, defaultSettings);
+            return JsonConvert.DeserializeObject<T>(NormalizeJsonContent(content), defaultSettings);
         }
 
         public static void Write(string path, object obj)
@@ -79,6 +79,17 @@ namespace UnityCommonEx
         public static string WriteRaw<T>(T obj)
         {
             return JsonConvert.SerializeObject(obj, Formatting.Indented, defaultSettings);
+        }
+
+        static string NormalizeJsonContent(string content)
+        {
+            if (string.IsNullOrEmpty(content))
+                return content;
+
+            if (content[0] == '\uFEFF')
+                return content.Substring(1);
+
+            return content;
         }
 
     }
