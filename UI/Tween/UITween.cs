@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace UnityCommonEx
 {
@@ -59,12 +60,7 @@ namespace UnityCommonEx
             if (TargetTransform == null)
                 return;
 
-            Vector2 sizeDelta = TargetTransform.sizeDelta;
-            if (((byte)PropType & (byte)UITweenPropType.SizeX) > 0)
-                sizeDelta.x = state.SizeX;
-            if (((byte)PropType & (byte)UITweenPropType.SizeY) > 0)
-                sizeDelta.y = state.SizeY;
-            TargetTransform.sizeDelta = sizeDelta;
+            ApplySizeState(state);
 
             if (((byte)PropType & (byte)UITweenPropType.Scale) > 0)
             {
@@ -74,6 +70,40 @@ namespace UnityCommonEx
 
             if (((byte)PropType & (byte)UITweenPropType.Rotation) > 0)
                 TargetTransform.localEulerAngles = state.Rotation;
+        }
+
+        void ApplySizeState(UITweenState state)
+        {
+            bool hasSizeX = ((byte)PropType & (byte)UITweenPropType.SizeX) > 0;
+            bool hasSizeY = ((byte)PropType & (byte)UITweenPropType.SizeY) > 0;
+            if (!hasSizeX && !hasSizeY)
+                return;
+
+            var layoutElement = TargetTransform != null ? TargetTransform.GetComponent<LayoutElement>() : null;
+            if (layoutElement != null)
+            {
+                if (hasSizeX)
+                {
+                    layoutElement.minWidth = state.SizeX;
+                    layoutElement.preferredWidth = state.SizeX;
+                }
+                if (hasSizeY)
+                {
+                    layoutElement.minHeight = state.SizeY;
+                    layoutElement.preferredHeight = state.SizeY;
+                }
+                LayoutRebuilder.MarkLayoutForRebuild(TargetTransform);
+                if (TargetTransform.parent is RectTransform parentRect)
+                    LayoutRebuilder.MarkLayoutForRebuild(parentRect);
+                return;
+            }
+
+            Vector2 sizeDelta = TargetTransform.sizeDelta;
+            if (hasSizeX)
+                sizeDelta.x = state.SizeX;
+            if (hasSizeY)
+                sizeDelta.y = state.SizeY;
+            TargetTransform.sizeDelta = sizeDelta;
         }
 
         public void PrepareTween()
