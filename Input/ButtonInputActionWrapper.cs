@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 using UnityEngine.UI;
 
 namespace UnityCommonEx
@@ -7,6 +8,8 @@ namespace UnityCommonEx
     {
         public TAction Action;
         public Button Button;
+        public Image BindingImage;
+        public InputBindingIconResourceConfig IconResourceConfig;
 
         TAction IInputActionWrapper<TAction>.Action => Action;
 
@@ -15,7 +18,9 @@ namespace UnityCommonEx
         protected override void OnActivate()
         {
             base.OnActivate();
-            GetInputManager()?.RegisterWrapper(this);
+            InputManager<TAction> inputManager = GetInputManager();
+            inputManager?.RegisterWrapper(this);
+            RefreshBindingImage(inputManager);
         }
 
         protected override void OnDeactivate()
@@ -38,6 +43,34 @@ namespace UnityCommonEx
             if (!CanTrigger())
                 return;
             Button.onClick.Invoke();
+        }
+
+        protected virtual void RefreshBindingImage(InputManager<TAction> inputManager)
+        {
+            if (BindingImage == null)
+                return;
+
+            InputBinding binding = inputManager?.GetPendingBinding(Action, 0);
+            if (binding == null || IconResourceConfig == null)
+            {
+                BindingImage.sprite = null;
+                BindingImage.enabled = false;
+                return;
+            }
+
+            InputBindingIconResourceConfig.Entry entry = IconResourceConfig.GetEntry(binding.GetBindingKey());
+            BindingImage.sprite = entry != null ? entry.Sprite : null;
+            BindingImage.enabled = BindingImage.sprite != null;
+
+            if (BindingImage.sprite == null)
+                return;
+
+            RectTransform rect = BindingImage.rectTransform;
+            Vector2 size = rect.sizeDelta;
+            Rect spriteRect = BindingImage.sprite.rect;
+            float aspect = spriteRect.height > 0f ? spriteRect.width / spriteRect.height : 1f;
+            size.x = size.y * aspect;
+            rect.sizeDelta = size;
         }
     }
 }
