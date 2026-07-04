@@ -1,6 +1,7 @@
 using System;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace UnityCommonEx
 {
@@ -23,11 +24,11 @@ namespace UnityCommonEx
 
     public class GeneralOptionDialogController : NodeController
     {
-
         public TMP_Text MessageText;
         public RichButtonController Button1;
         public RichButtonController Button2;
         public RichButtonController Button3;
+        public Button BackgroundButton;
 
         private const int ButtonSlotCount = 3;
         private readonly Action[] callbacks = new Action[ButtonSlotCount];
@@ -37,7 +38,16 @@ namespace UnityCommonEx
         {
             base.OnInit();
             buttons = new[] { Button1, Button2, Button3 };
+            if (BackgroundButton != null)
+                BackgroundButton.onClick.AddListener(OnBackgroundClicked);
             Clear();
+        }
+
+        protected override void OnRelease()
+        {
+            if (BackgroundButton != null)
+                BackgroundButton.onClick.RemoveListener(OnBackgroundClicked);
+            base.OnRelease();
         }
 
         public void Set(in GeneralOptionDialogConfig config)
@@ -70,9 +80,13 @@ namespace UnityCommonEx
         void OnButtonClick(int index)
         {
             if (index >= 0 && index < callbacks.Length)
-            {
                 callbacks[index]?.Invoke();
-            }
+            Deactivate();
+        }
+
+        void OnBackgroundClicked()
+        {
+            callbacks[2]?.Invoke();
             Deactivate();
         }
 
@@ -85,15 +99,11 @@ namespace UnityCommonEx
             foreach (var button in buttons)
             {
                 if (button != null)
-                {
                     button.gameObject.SetActive(false);
-                }
             }
 
             for (int i = 0; i < callbacks.Length; i++)
                 callbacks[i] = null;
         }
-
     }
-
 }
