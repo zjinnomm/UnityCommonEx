@@ -6,27 +6,26 @@ using Newtonsoft.Json.Linq;
 namespace UnityCommonEx
 {
     /// <summary>
-    /// 配置一个静态方法引用（格式 ClassName.MethodName），Init 时通过反射解析并缓存，触发时直接调用。
-    /// 模板由参数列表与返回类型决定，通过 Init 传入。
+    /// Stores a static method reference in the ClassName.MethodName format.
+    /// Init resolves and caches the method for later invocation.
     /// </summary>
     [JsonConverter(typeof(CachedStaticMethodRefConverter))]
     public class CachedStaticMethodRef : IDataTableStringField
     {
         /// <summary>
-        /// 函数名（格式 ClassName.MethodName），仅由 JSON 从 string 反序列化得到。
+        /// Static method name in the ClassName.MethodName format.
         /// </summary>
         public string Function { get; set; }
 
         private MethodInfo _method;
 
         /// <summary>
-        /// 是否已成功解析并缓存。
+        /// Whether the referenced method has been resolved and cached.
         /// </summary>
         public bool IsResolved => _method != null;
 
         /// <summary>
-        /// 解析并缓存静态方法，签名必须匹配 parameterTypes 与 returnType。
-        /// null/空字符串时不报错直接返回；非空但反射不到类型/方法/签名不对时才报错。
+        /// Resolves and caches the referenced static method using the required signature.
         /// </summary>
         public void Init(Type[] parameterTypes, Type returnType, string errorContext = null)
         {
@@ -69,7 +68,7 @@ namespace UnityCommonEx
                 return;
             }
 
-            if (methodInfo.ReturnType != returnType)
+            if (methodInfo.ReturnType != returnType && !(returnType == typeof(UnlockProgress) && methodInfo.ReturnType == typeof(bool)))
             {
                 LogUtil.Error($"{errorContext}: Method '{methodName}' in class '{className}' must return {returnType.Name} for Function '{Function}'");
                 return;
@@ -79,7 +78,7 @@ namespace UnityCommonEx
         }
 
         /// <summary>
-        /// 调用缓存的静态方法；失败或异常时返回 false。
+        /// Invokes the cached static method and returns false when invocation fails.
         /// </summary>
         public bool TryInvoke(object[] args, out object result)
         {
@@ -99,7 +98,7 @@ namespace UnityCommonEx
         }
 
         /// <summary>
-        /// 调用并强转返回值为 T；失败或类型不匹配时返回 false。
+        /// Invokes the cached method and converts its return value to T.
         /// </summary>
         public bool TryInvoke<T>(object[] args, out T result)
         {
@@ -121,7 +120,7 @@ namespace UnityCommonEx
     }
 
     /// <summary>
-    /// 仅支持从 string 反序列化（格式 ClassName.MethodName），不支持序列化。
+    /// Converts the ClassName.MethodName string representation to a method reference.
     /// </summary>
     public class CachedStaticMethodRefConverter : JsonConverter<CachedStaticMethodRef>
     {
@@ -151,7 +150,7 @@ namespace UnityCommonEx
 
         public override void WriteJson(JsonWriter writer, CachedStaticMethodRef value, JsonSerializer serializer)
         {
-            throw new NotImplementedException("CachedStaticMethodRef 不支持序列化");
+            throw new NotImplementedException("CachedStaticMethodRef does not support serialization.");
         }
     }
 }

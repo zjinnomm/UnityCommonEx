@@ -16,6 +16,7 @@ namespace UnityCommonEx
     public sealed class StatMetricDefinition
     {
         public string MetricId;
+        public MultiLingualText Title;
         public StatAggregateRule AggregateRule;
         public StatDimensionDefinition[] Dimensions = Array.Empty<StatDimensionDefinition>();
         public bool Disabled;
@@ -186,6 +187,7 @@ namespace UnityCommonEx
     public sealed class StatSchemaRow : BaseDataTableRow<string>
     {
         public string MetricId;
+        public MultiLingualText Title;
         public StatAggregateRule AggregateRule;
         public int DimensionCount;
         public StatDimensionValueType[] DimensionValueTypes;
@@ -246,6 +248,7 @@ namespace UnityCommonEx
             return new StatMetricDefinition
             {
                 MetricId = MetricId,
+                Title = Title,
                 AggregateRule = AggregateRule,
                 Dimensions = dims,
                 Disabled = Disabled
