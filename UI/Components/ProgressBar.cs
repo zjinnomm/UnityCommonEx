@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace UnityCommonEx
 {
@@ -18,11 +18,21 @@ namespace UnityCommonEx
             set
             {
                 progress = Mathf.Clamp01(value);
-                if (Meter != null && Background != null)
-                {
-                    Meter.sizeDelta = new Vector2(Background.sizeDelta.x * progress, Meter.sizeDelta.y);
-                }
+                ApplyProgress();
             }
+        }
+
+        void OnRectTransformDimensionsChange()
+        {
+            ApplyProgress();
+        }
+
+        void ApplyProgress()
+        {
+            if (Meter == null || Background == null)
+                return;
+
+            Meter.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, Background.rect.width * progress);
         }
 
     }
