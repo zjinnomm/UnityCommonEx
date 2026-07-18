@@ -7,11 +7,13 @@ namespace UnityCommonEx
     public abstract class ButtonInputActionWrapper<TAction> : NodeController, IInputActionWrapper<TAction> where TAction : struct, Enum
     {
         public TAction Action;
+        public int Priority;
         public Button Button;
         public Image BindingImage;
         public InputBindingIconResourceConfig IconResourceConfig;
 
         TAction IInputActionWrapper<TAction>.Action => Action;
+        int IInputActionWrapper<TAction>.Priority => Priority;
 
         protected abstract InputManager<TAction> GetInputManager();
 

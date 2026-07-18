@@ -237,7 +237,7 @@ namespace UnityCommonEx
             return true;
         }
 
-        public void ProcessInput()
+        public void ProcessInput(bool suppressActions = false)
         {
             if (!initialized || activeRebind != null)
                 return;
@@ -246,6 +246,8 @@ namespace UnityCommonEx
             foreach (var kvp in triggeredBindingsByAction)
                 kvp.Value.Clear();
 
+            if (suppressActions)
+                return;
             actionScratch.Clear();
             foreach (var kvp in committedBindingsByAction)
                 actionScratch.Add(kvp.Key);
@@ -838,6 +840,7 @@ namespace UnityCommonEx
             if (!wrappersByAction.TryGetValue(action, out var wrappers) || wrappers == null || wrappers.Count == 0)
                 return false;
 
+            IInputActionWrapper<TAction> topWrapper = null;
             for (int i = wrappers.Count - 1; i >= 0; i--)
             {
                 IInputActionWrapper<TAction> wrapper = wrappers[i];
@@ -850,11 +853,15 @@ namespace UnityCommonEx
                 if (!wrapper.CanTrigger())
                     continue;
 
-                wrapper.Trigger();
-                return true;
+                if (topWrapper == null || wrapper.Priority > topWrapper.Priority)
+                    topWrapper = wrapper;
             }
 
-            return false;
+            if (topWrapper == null)
+                return false;
+
+            topWrapper.Trigger();
+            return true;
         }
 
         private static bool IsDeadUnityObject(object owner)
