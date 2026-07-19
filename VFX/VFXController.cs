@@ -418,9 +418,8 @@ namespace UnityCommonEx
             base.OnPoolableReturned();
         }
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
-            base.OnDeactivate();
             ClearVFX();
         }
 

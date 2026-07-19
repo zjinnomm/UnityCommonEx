@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -13,9 +13,8 @@ namespace UnityCommonEx
         Dictionary<FloatingMessageController, uint> messageTimers = new Dictionary<FloatingMessageController, uint>();
         CanvasScaler canvasScaler;
 
-        protected override void OnActivate()
+        private void OnEnable()
         {
-            base.OnActivate();
             canvasScaler = GetComponentInParent<CanvasScaler>();
         } 
 

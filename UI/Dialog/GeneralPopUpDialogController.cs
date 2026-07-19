@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -67,9 +67,8 @@ namespace UnityCommonEx
             HideDialog();
         }
 
-        protected override void OnActivate()
+        private void OnEnable()
         {
-            base.OnActivate();
             PlayShowTween();
         }
 
@@ -178,9 +177,8 @@ namespace UnityCommonEx
                 DialogPanel.gameObject.SetActive(false);
         }
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
-            base.OnDeactivate();
             HideDialog();
         }
 

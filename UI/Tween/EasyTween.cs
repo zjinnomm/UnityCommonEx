@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace UnityCommonEx
 {
@@ -27,18 +27,6 @@ namespace UnityCommonEx
         private void OnDisable()
         {
             StopLoopTween();
-        }
-
-        protected override void OnActivate()
-        {
-            base.OnActivate();
-            StartLoopTween();
-        }
-
-        protected override void OnDeactivate()
-        {
-            StopLoopTween();
-            base.OnDeactivate();
         }
 
         private void StartLoopTween()

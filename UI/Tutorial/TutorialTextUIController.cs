@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
 namespace UnityCommonEx
@@ -21,10 +21,9 @@ namespace UnityCommonEx
             }
         }
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
             ClearText();
-            base.OnDeactivate();
         }
 
         public virtual void SetText(string text)

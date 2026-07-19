@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -27,10 +27,9 @@ namespace UnityCommonEx
             }
         }
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
             ClearButtonListeners();
-            base.OnDeactivate();
         }
 
         public void SetConfig(InputBindingGameSettingFieldConfig config, IInputBindingSettingsManager manager)

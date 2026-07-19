@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,18 +17,16 @@ namespace UnityCommonEx
 
         protected abstract InputManager<TAction> GetInputManager();
 
-        protected override void OnActivate()
+        private void OnEnable()
         {
-            base.OnActivate();
             InputManager<TAction> inputManager = GetInputManager();
             inputManager?.RegisterWrapper(this);
             RefreshBindingImage(inputManager);
         }
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
             GetInputManager()?.UnregisterWrapper(this);
-            base.OnDeactivate();
         }
 
         public virtual bool CanTrigger()

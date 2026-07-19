@@ -79,10 +79,9 @@ namespace UnityCommonEx
             }
         }
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
             Clear();
-            base.OnDeactivate();
         }
 
     }

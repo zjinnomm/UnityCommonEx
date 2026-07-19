@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UnityEngine;
 
 namespace UnityCommonEx
@@ -20,10 +20,9 @@ namespace UnityCommonEx
         float[] characterRevealTimes;
         TMP_MeshInfo[] cachedMeshInfo;
 
-        protected override void OnDeactivate()
+        private void OnDisable()
         {
             StopAnimation();
-            base.OnDeactivate();
         }
 
         protected override void OnRelease()

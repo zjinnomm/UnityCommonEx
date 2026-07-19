@@ -22,14 +22,9 @@ namespace UnityCommonEx
             OnInit();
         }
 
-        private void Start()
-        {
-            OnActivate();
-        }
 
         private void OnDestroy()
         {
-            OnDeactivate();
             OnRelease();
         }
 
@@ -43,45 +38,17 @@ namespace UnityCommonEx
         public void Activate()
         {
             if (!gameObject.activeSelf)
-            {
                 gameObject.SetActive(true);
-                if (Activated)
-                {
-                    OnActivate();
-                    foreach (NodeController controller in GetComponentsInChildren<NodeController>())
-                    {
-                        if (controller != this && controller.Activated)
-                        {
-                            controller.OnActivate();
-                        }
-                    }
-                }
-            }
         }
 
         public void Deactivate()
         {
             if (gameObject.activeSelf)
-            {
-                if (Activated)
-                {
-                    OnDeactivate();
-                    foreach (NodeController controller in GetComponentsInChildren<NodeController>())
-                    {
-                        if (controller != this && controller.Activated)
-                        {
-                            controller.OnDeactivate();
-                        }
-                    }
-                }
                 gameObject.SetActive(false);
-            }
         }
 
 
         protected virtual void OnInit() { }
-        protected virtual void OnActivate() { }
-        protected virtual void OnDeactivate() { }
         protected virtual void OnRelease() { }
         
 
