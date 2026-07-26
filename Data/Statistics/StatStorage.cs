@@ -232,11 +232,6 @@ namespace UnityCommonEx
 
         void RecordInternal(string metricId, double value, byte dimensionCount, StatDimensionValue dim0, StatDimensionValue dim1)
         {
-            if (Merged)
-            {
-                LogUtil.Error("[StatStorage] Record is not allowed after storage has been merged.");
-                return;
-            }
             if (!TryGetMetricDefinition(metricId, out StatMetricDefinition definition))
                 return;
             if (!TryNormalizeInputKey(metricId, definition, dimensionCount, dim0, dim1, out StatPointKey key))
