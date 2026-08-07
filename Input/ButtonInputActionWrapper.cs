@@ -9,6 +9,7 @@ namespace UnityCommonEx
         public TAction Action;
         public int Priority;
         public Button Button;
+        public ButtonSFXPlayer SFXPlayer;
         public Image BindingImage;
         public InputBindingIconResourceConfig IconResourceConfig;
 
@@ -42,6 +43,7 @@ namespace UnityCommonEx
         {
             if (!CanTrigger())
                 return;
+            SFXPlayer?.Play();
             Button.onClick.Invoke();
         }
 
