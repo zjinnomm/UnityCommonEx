@@ -32,6 +32,8 @@ namespace UnityCommonEx
         public GameObject VeilMaskPrefab;
         public GameObject TextPrefab;
         public Sprite CircleMaskSprite;
+        [Tooltip("Extra veil mask padding in local pixels: top, bottom, left, right.")]
+        public Vector4 VeilPadding = Vector4.zero;
         public float TextPadding = 10f;
 
         public GameObject Veil;
@@ -88,9 +90,14 @@ namespace UnityCommonEx
             }
 
             RectTransform root = Veil.GetComponent<RectTransform>();
+            Rect paddedRect = Rect.MinMaxRect(
+                rect.xMin - VeilPadding.z / root.rect.width,
+                rect.yMin - VeilPadding.y / root.rect.height,
+                rect.xMax + VeilPadding.w / root.rect.width,
+                rect.yMax + VeilPadding.x / root.rect.height);
             image.gameObject.SetActive(true);
-            image.rectTransform.anchoredPosition = new Vector2((rect.center.x - 0.5f) * root.rect.width, (rect.center.y - 0.5f) * root.rect.height);
-            image.rectTransform.sizeDelta = new Vector2(rect.size.x * root.rect.width, rect.size.y * root.rect.height);
+            image.rectTransform.anchoredPosition = new Vector2((paddedRect.center.x - 0.5f) * root.rect.width, (paddedRect.center.y - 0.5f) * root.rect.height);
+            image.rectTransform.sizeDelta = new Vector2(paddedRect.size.x * root.rect.width, paddedRect.size.y * root.rect.height);
 
             image.sprite = shape switch {
                 HighlightTutorialEntry.ShapeType.Circle => CircleMaskSprite,
@@ -98,7 +105,7 @@ namespace UnityCommonEx
             };
             if (TutorialManager.Instance.MaskId > 0)
             {
-                InteractionModel.ExcludeRegion(TutorialManager.Instance.MaskId, key, rect);
+                InteractionModel.ExcludeRegion(TutorialManager.Instance.MaskId, key, paddedRect);
             }
             ActivatedEntries.Add(new ActivatedEntry{
                 Index = key,
