@@ -17,6 +17,7 @@ namespace UnityCommonEx
         public string Path;
         public bool IsDialog;
         public int SortOrder = 0;
+        public InputScope InputScope = UnityCommonEx.InputScope.UI;
 
     }
 
@@ -72,8 +73,10 @@ namespace UnityCommonEx
                 if (currentDialogType.Equals(pageType))
                 {
                     currentDialogController.Activate();
+                    ActivateInputScope(currentDialogController, GetConfig(pageType));
                     return currentDialogController;
                 }
+                InputScopeRegistry.DeactivateUI(currentDialogController);
                 currentDialogController.Deactivate();
                 currentDialogController = null;
             }
@@ -81,6 +84,7 @@ namespace UnityCommonEx
             if (dialogControllers.TryGetValue(pageType, out currentDialogController))
             {
                 currentDialogController.Activate();
+                ActivateInputScope(currentDialogController, GetConfig(pageType));
                 return currentDialogController;
             }
             
@@ -115,6 +119,7 @@ namespace UnityCommonEx
             currentDialogController.gameObject.name += $"_{Convert.ChangeType(pageType, pageType.GetTypeCode())}";
 #endif
             dialogControllers.Add(pageType, currentDialogController);
+            ActivateInputScope(currentDialogController, config);
             return currentDialogController;
         }
 
@@ -124,6 +129,7 @@ namespace UnityCommonEx
             if (uiControllers.TryGetValue(pageType, out controller))
             {
                 controller.Activate();
+                ActivateInputScope(controller, GetConfig(pageType));
                 return controller;
             }
             
@@ -168,6 +174,7 @@ namespace UnityCommonEx
             controller.gameObject.name += $"_{Convert.ChangeType(pageType, pageType.GetTypeCode())}";
 #endif
             uiControllers.Add(pageType, controller);
+            ActivateInputScope(controller, config);
             return controller;
         }
 
@@ -232,6 +239,7 @@ namespace UnityCommonEx
             {
                 if (controller != null)
                 {
+                    InputScopeRegistry.DeactivateUI(controller);
                     controller.Deactivate();
                 }
             }
@@ -241,6 +249,7 @@ namespace UnityCommonEx
         {
             if (currentDialogController != null)
             {
+                InputScopeRegistry.DeactivateUI(currentDialogController);
                 currentDialogController.Deactivate();
                 currentDialogController = null;
             }
@@ -258,6 +267,7 @@ namespace UnityCommonEx
         {
             if (currentDialogController != null && currentDialogType.Equals(pageType))
             {
+                InputScopeRegistry.DeactivateUI(currentDialogController);
                 currentDialogController.Deactivate();
                 currentDialogController = null;
                 
@@ -302,8 +312,25 @@ namespace UnityCommonEx
             }
         }
 
+        private TR GetConfig(TE pageType)
+        {
+            return uiConfigTable?.GetRow(pageType);
+        }
+
+        private static void ActivateInputScope(NodeController controller, TR config)
+        {
+            if (controller == null || config == null)
+                return;
+            InputScopeRegistry.ActivateUI(controller, controller.transform, config.InputScope);
+        }
+
         protected override void OnRelease()
         {
+            foreach (var controller in uiControllers.Values)
+                InputScopeRegistry.DeactivateUI(controller);
+            foreach (var controller in dialogControllers.Values)
+                InputScopeRegistry.DeactivateUI(controller);
+
             foreach (var handle in handles.Values)
             {
                 if (handle.IsValid())

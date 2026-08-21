@@ -11,6 +11,7 @@ namespace UnityCommonEx
         {
             public object Owner;
             public Action<TAction> Callback;
+            public InputScope InputScope;
         }
 
         private sealed class RebindState
@@ -277,13 +278,22 @@ namespace UnityCommonEx
             }
         }
 
-        public bool WasTriggeredThisFrame(TAction action)
+        public bool WasTriggeredThisFrame(
+            TAction action,
+            object owner = null,
+            InputScope inputScope = InputScope.World)
         {
-            return triggeredActions.Contains(action);
+            return triggeredActions.Contains(action) && IsScopeActive(owner, inputScope);
         }
 
-        public bool IsActuated(TAction action)
+        public bool IsActuated(
+            TAction action,
+            object owner = null,
+            InputScope inputScope = InputScope.World)
         {
+            if (!IsScopeActive(owner, inputScope))
+                return false;
+
             if (!committedBindingsByAction.TryGetValue(action, out var bindings) || bindings == null)
                 return false;
 
@@ -355,9 +365,13 @@ namespace UnityCommonEx
             return EmptyBindings;
         }
 
-        public bool WasTriggeredBy(TAction action, Predicate<InputBinding> predicate)
+        public bool WasTriggeredBy(
+            TAction action,
+            Predicate<InputBinding> predicate,
+            object owner = null,
+            InputScope inputScope = InputScope.World)
         {
-            if (predicate == null)
+            if (predicate == null || !IsScopeActive(owner, inputScope))
                 return false;
 
             IReadOnlyList<InputBinding> bindings = GetTriggeredBindings(action);
@@ -370,7 +384,16 @@ namespace UnityCommonEx
             return false;
         }
 
-        public void RegisterListener(TAction action, object owner, Action<TAction> callback)
+        private static bool IsScopeActive(object owner, InputScope inputScope)
+        {
+            return InputScopeRegistry.ResolveScope(owner, inputScope) == InputScopeRegistry.CurrentScope;
+        }
+
+        public void RegisterListener(
+            TAction action,
+            object owner,
+            Action<TAction> callback,
+            InputScope inputScope = InputScope.World)
         {
             if (callback == null)
                 return;
@@ -385,13 +408,17 @@ namespace UnityCommonEx
             {
                 ActionListener listener = listeners[i];
                 if (ReferenceEquals(listener.Owner, owner) && listener.Callback == callback)
+                {
+                    listener.InputScope = inputScope;
                     return;
+                }
             }
 
             listeners.Add(new ActionListener
             {
                 Owner = owner,
-                Callback = callback
+                Callback = callback,
+                InputScope = inputScope,
             });
         }
 
@@ -822,6 +849,7 @@ namespace UnityCommonEx
             if (!listenersByAction.TryGetValue(action, out var listeners) || listeners == null || listeners.Count == 0)
                 return;
 
+            InputScope currentScope = InputScopeRegistry.CurrentScope;
             for (int i = listeners.Count - 1; i >= 0; i--)
             {
                 ActionListener listener = listeners[i];
@@ -830,6 +858,9 @@ namespace UnityCommonEx
                     listeners.RemoveAt(i);
                     continue;
                 }
+
+                if (InputScopeRegistry.ResolveScope(listener.Owner, listener.InputScope) != currentScope)
+                    continue;
 
                 listener.Callback(action);
             }
@@ -840,6 +871,7 @@ namespace UnityCommonEx
             if (!wrappersByAction.TryGetValue(action, out var wrappers) || wrappers == null || wrappers.Count == 0)
                 return false;
 
+            InputScope currentScope = InputScopeRegistry.CurrentScope;
             IInputActionWrapper<TAction> topWrapper = null;
             for (int i = wrappers.Count - 1; i >= 0; i--)
             {
@@ -851,6 +883,9 @@ namespace UnityCommonEx
                 }
 
                 if (!wrapper.CanTrigger())
+                    continue;
+
+                if (InputScopeRegistry.ResolveScope(wrapper, InputScope.World) != currentScope)
                     continue;
 
                 if (topWrapper == null || wrapper.Priority > topWrapper.Priority)
