@@ -52,7 +52,7 @@ namespace UnityCommonEx
             bgmSource.volume = BGMVolume;
         }
 
-        protected override bool PlaySFXCore(string key, float pitch, float volume)
+        protected override bool PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition)
         {
             AudioClip clip = GetOrLoadClip(key);
             if (clip == null)
@@ -69,6 +69,11 @@ namespace UnityCommonEx
             source.clip = clip;
             source.pitch = pitch;
             source.volume = volume * SFXVolume;
+            source.transform.position = worldPosition ?? transform.position;
+            source.spatialBlend = worldPosition.HasValue ? 1f : 0f;
+            source.rolloffMode = AudioRolloffMode.Linear;
+            source.minDistance = 10f;
+            source.maxDistance = 50f;
             source.gameObject.SetActive(true);
             source.Play();
 

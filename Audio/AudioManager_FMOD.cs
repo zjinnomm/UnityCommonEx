@@ -49,7 +49,7 @@ namespace UnityCommonEx
 #endif
         }
 
-        protected override bool PlaySFXCore(string key, float pitch, float volume)
+        protected override bool PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition)
         {
             string eventPath = GetSFXEventPath(key);
             if (string.IsNullOrEmpty(eventPath))
@@ -63,6 +63,8 @@ namespace UnityCommonEx
                 var instance = RuntimeManager.CreateInstance(eventPath);
                 ApplySFXPitch(instance, pitch);
                 instance.setVolume(volume);
+                if (worldPosition.HasValue)
+                    instance.set3DAttributes(RuntimeUtils.To3DAttributes(worldPosition.Value));
                 instance.start();
                 instance.release();
                 return true;

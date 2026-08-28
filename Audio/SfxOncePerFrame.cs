@@ -14,5 +14,14 @@ namespace UnityCommonEx
             lastFrame = Time.frameCount;
             return AudioManager.Instance.PlaySFX(key, pitch, volume);
         }
+
+        public bool TryPlayAtPosition(string key, Vector3 worldPosition, float pitch = 1f, float volume = 1f)
+        {
+            if (lastFrame == Time.frameCount || string.IsNullOrEmpty(key) || AudioManager.Instance == null)
+                return false;
+
+            lastFrame = Time.frameCount;
+            return AudioManager.Instance.PlaySFXAtPosition(key, worldPosition, pitch, volume);
+        }
     }
 }
