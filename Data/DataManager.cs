@@ -22,9 +22,14 @@ namespace UnityCommonEx
         public static void LoadPacked(string path)
         {
             TextAsset data = Resources.Load(path) as TextAsset;
-            using (BinaryReader reader = new BinaryReader(new MemoryStream(data.bytes)))
+            LoadPacked(data.bytes);
+        }
+
+        public static void LoadPacked(byte[] bytes)
+        {
+            using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes)))
             {
-                while (reader.PeekChar() > 0)
+                while (reader.BaseStream.Position < reader.BaseStream.Length)
                 {
                     Type keyType = Type.GetType(reader.ReadString());
                     Type dataType = Type.GetType(reader.ReadString());

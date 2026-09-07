@@ -77,11 +77,16 @@ namespace UnityCommonEx
                 return;
             }
 
+            ParsePackedConfigs(data.bytes, resourcePath);
+        }
+
+        public static void ParsePackedConfigs(byte[] bytes, string resourcePath)
+        {
             var processedSections = new HashSet<string>();
 
             try
             {
-                using (BinaryReader reader = new BinaryReader(new MemoryStream(data.bytes), Encoding.UTF8))
+                using (BinaryReader reader = new BinaryReader(new MemoryStream(bytes), Encoding.UTF8))
                 {
                     while (reader.BaseStream.Position < reader.BaseStream.Length)
                     {

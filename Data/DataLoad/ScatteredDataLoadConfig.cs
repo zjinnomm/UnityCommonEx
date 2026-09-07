@@ -21,8 +21,15 @@ namespace UnityCommonEx
 
         List<TypeConfig> TypeConfigs;
 
-        public void Prepare()
+        public void Prepare(bool throwOnError = false)
         {
+            void ReportError(string format, params object[] args)
+            {
+                if (throwOnError)
+                    throw new InvalidDataException(string.Format(format, args));
+                LogUtil.Error(format, args);
+            }
+
             if (TypeConfigs == null)
             {
                 TypeConfigs = new List<TypeConfig>();
@@ -33,7 +40,7 @@ namespace UnityCommonEx
                 string[] types = pair.Key.Split(":");
                 if (types.Length > 2)
                 {
-                    LogUtil.Error("too many types to unpack");
+                    ReportError("too many types to unpack");
                     return;
                 }
                 Type dataType = Type.GetType(types[types.Length - 1]);
@@ -44,14 +51,14 @@ namespace UnityCommonEx
                     keyType = Type.GetType(types[0]);
                     if (keyType == null)
                     {
-                        LogUtil.Error("cannot reflect key type {0}", types[0]);
+                        ReportError("cannot reflect key type {0}", types[0]);
                         return;
                     }
                 }
 
                 if (dataType == null)
                 {
-                    LogUtil.Error("type {0} does not exist.", pair.Key);
+                    ReportError("type {0} does not exist.", pair.Key);
                     return;
                 }
 
@@ -59,7 +66,7 @@ namespace UnityCommonEx
                 {
                     if (!typeof(BaseDataTemplate).IsAssignableFrom(dataType))
                     {
-                        LogUtil.Error("type {0} is not a DataTemplate.", dataType);
+                        ReportError("type {0} is not a DataTemplate.", dataType);
                         return;
                     }
                 }
@@ -67,14 +74,14 @@ namespace UnityCommonEx
                 {
                     if (!typeof(BaseDataTableRow<>).MakeGenericType(keyType).IsAssignableFrom(dataType))
                     {
-                        LogUtil.Error("type {0} is not a DataRow with key type {1}.", dataType, keyType);
+                        ReportError("type {0} is not a DataRow with key type {1}.", dataType, keyType);
                         return;
                     }
                 }
                 
                 if (pair.Value == null || pair.Value.Length == 0)
                 {
-                    LogUtil.Error("type {0}'s load map is empty.", pair.Key);
+                    ReportError("type {0}'s load map is empty.", pair.Key);
                     return;
                 }
 

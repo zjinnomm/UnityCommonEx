@@ -55,6 +55,24 @@ namespace UnityCommonEx
             LogUtil.Init();
             TickingManager.Init();
 
+            LoadContent();
+
+            // 初始化通用 Manager
+            if (VFXManager != null)
+            {
+                VFXManager.Initialize();
+            }
+            if (AudioManager != null)
+            {
+                AudioManager.Initialize();
+            }
+
+            DontDestroyOnLoad(this);
+
+        }
+
+        protected virtual void LoadContent()
+        {
             DataLoadMethodType dataLoadMethod;
             DataLoadMethodType configLoadMethod;
 #if UNITY_EDITOR
@@ -82,18 +100,6 @@ namespace UnityCommonEx
             {
                 DataManager.LoadPacked(PackedDataPath);
             }
-
-            // 初始化通用 Manager
-            if (VFXManager != null)
-            {
-                VFXManager.Initialize();
-            }
-            if (AudioManager != null)
-            {
-                AudioManager.Initialize();
-            }
-
-            DontDestroyOnLoad(this);
 
         }
 
