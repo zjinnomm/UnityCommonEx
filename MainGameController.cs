@@ -104,11 +104,14 @@ namespace UnityCommonEx
             float gameDelta = uiDelta * EffectiveGameDilation;
             TickingManager.Tick(gameDelta, uiDelta);
             TimerManager.Tick(uiDelta);
+            OnUIUpdate(uiDelta);
             if (gameDelta > 0f)
             {
                 OnUpdate(gameDelta);
             }
         }
+
+        virtual protected void OnUIUpdate(float delta) { }
 
         virtual protected void OnUpdate(float delta) { }
 
