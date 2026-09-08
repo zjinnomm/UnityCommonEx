@@ -48,11 +48,12 @@ namespace UnityCommonEx
         public string PackedConfigPath;
 
         protected override bool IsPersistent => true;
+        protected virtual string LogDirectory => null;
 
         protected override void OnInit()
         {
             base.OnInit();
-            LogUtil.Init();
+            LogUtil.Init(LogDirectory);
             TickingManager.Init();
 
             LoadContent();
