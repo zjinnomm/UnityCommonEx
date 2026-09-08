@@ -12,7 +12,7 @@ namespace UnityCommonEx
                 return false;
 
             lastFrame = Time.frameCount;
-            return AudioManager.Instance.PlaySFX(key, pitch, volume);
+            return AudioManager.Instance.PlaySFX(key, pitch, volume) != null;
         }
 
         public bool TryPlayAtPosition(string key, Vector3 worldPosition, float pitch = 1f, float volume = 1f)
@@ -21,7 +21,7 @@ namespace UnityCommonEx
                 return false;
 
             lastFrame = Time.frameCount;
-            return AudioManager.Instance.PlaySFXAtPosition(key, worldPosition, pitch, volume);
+            return AudioManager.Instance.PlaySFXAtPosition(key, worldPosition, pitch, volume) != null;
         }
     }
 }

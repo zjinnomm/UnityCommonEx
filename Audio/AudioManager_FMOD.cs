@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 #if FMOD_PRESENT
@@ -21,6 +22,53 @@ namespace UnityCommonEx
         private DataTable<string, BGMConfigRow> bgmConfigTable;
 
 #if FMOD_PRESENT
+        private sealed class FMODSFXHandle : SFXHandle
+        {
+            private EventInstance instance;
+            private readonly AudioManager_FMOD owner;
+            private float volume;
+            public FMODSFXHandle(AudioManager_FMOD owner, EventInstance instance, float volume)
+            {
+                this.owner = owner;
+                this.instance = instance;
+                this.volume = volume;
+            }
+            public override bool IsPlaying
+            {
+                get
+                {
+                    if (IsFinished || !instance.isValid()) return false;
+                    return instance.getPlaybackState(out var state) == FMOD.RESULT.OK && state != PLAYBACK_STATE.STOPPED;
+                }
+            }
+            public override void SetVolume(float value)
+            {
+                if (IsFinished) return;
+                volume = Mathf.Clamp01(value);
+                ApplyVolume();
+            }
+            public void ApplyVolume()
+            {
+                if (!IsFinished) instance.setVolume(volume * (owner.sfxBus.isValid() ? 1f : owner.SFXVolume));
+            }
+            public override void SetPitch(float pitch) { if (!IsFinished) ApplySFXPitch(instance, pitch); }
+            public override void SetPosition(Vector3 position)
+            {
+                if (!IsFinished) instance.set3DAttributes(RuntimeUtils.To3DAttributes(position));
+            }
+            public override bool SetParameter(string name, float value)
+            {
+                return !IsFinished && !string.IsNullOrEmpty(name) && instance.setParameterByName(name, value) == FMOD.RESULT.OK;
+            }
+            protected override void ReleasePlayback()
+            {
+                if (!instance.isValid()) return;
+                instance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
+                instance.release();
+                instance.clearHandle();
+            }
+        }
+        private readonly List<FMODSFXHandle> playingSFX = new List<FMODSFXHandle>();
         private EventInstance currentBGMInstance;
         private Bus bgmBus;
         private Bus sfxBus;
@@ -49,12 +97,12 @@ namespace UnityCommonEx
 #endif
         }
 
-        protected override bool PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition)
+        protected override SFXHandle PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition)
         {
             string eventPath = GetSFXEventPath(key);
             if (string.IsNullOrEmpty(eventPath))
             {
-                return false;
+                return null;
             }
 
 #if FMOD_PRESENT
@@ -62,21 +110,26 @@ namespace UnityCommonEx
             {
                 var instance = RuntimeManager.CreateInstance(eventPath);
                 ApplySFXPitch(instance, pitch);
-                instance.setVolume(volume);
+                instance.setVolume(volume * (sfxBus.isValid() ? 1f : SFXVolume));
                 if (worldPosition.HasValue)
                     instance.set3DAttributes(RuntimeUtils.To3DAttributes(worldPosition.Value));
-                instance.start();
-                instance.release();
-                return true;
+                if (instance.start() != FMOD.RESULT.OK)
+                {
+                    instance.release();
+                    return null;
+                }
+                var handle = new FMODSFXHandle(this, instance, volume);
+                playingSFX.Add(handle);
+                return handle;
             }
             catch (EventNotFoundException)
             {
                 LogUtil.Warn("AudioManager_FMOD: invalid SFX event for {0}: {1}", key, eventPath);
-                return false;
+                return null;
             }
 #else
             LogUtil.Warn("AudioManager_FMOD: FMOD_PRESENT is not enabled, cannot play SFX {0}", key);
-            return false;
+            return null;
 #endif
         }
 
@@ -158,6 +211,7 @@ namespace UnityCommonEx
             {
                 sfxBus.setVolume(volume);
             }
+            foreach (var handle in playingSFX) handle.ApplyVolume();
 #endif
         }
 
@@ -179,6 +233,9 @@ namespace UnityCommonEx
         protected override void ReleaseBackend()
         {
 #if FMOD_PRESENT
+            var active = playingSFX.ToArray();
+            playingSFX.Clear();
+            foreach (var handle in active) handle.Finish(SFXEndReason.BackendReleased);
             StopBGMInstance();
 #endif
         }
@@ -219,6 +276,17 @@ namespace UnityCommonEx
         }
 
 #if FMOD_PRESENT
+        private void Update()
+        {
+            for (int i = playingSFX.Count - 1; i >= 0; i--)
+            {
+                var handle = playingSFX[i];
+                if (handle.IsPlaying) continue;
+                playingSFX.RemoveAt(i);
+                handle.Finish(SFXEndReason.Completed);
+            }
+        }
+
         private static Bus TryGetBus(string path)
         {
             if (string.IsNullOrEmpty(path))
@@ -251,15 +319,10 @@ namespace UnityCommonEx
 
         private static void ApplySFXPitch(EventInstance instance, float pitch)
         {
-            if (Mathf.Approximately(pitch, 1f))
-            {
-                return;
-            }
-
             FMOD.RESULT result = instance.setParameterByName(PitchShiftParameterName, pitch, false);
             if (result != FMOD.RESULT.OK)
             {
-                LogUtil.Error("Failed");
+                instance.setPitch(pitch);
             }
         }
 #endif

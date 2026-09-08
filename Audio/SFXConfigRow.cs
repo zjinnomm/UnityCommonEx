@@ -10,6 +10,8 @@ namespace UnityCommonEx
         public string Key;
         public string Path; // AudioClip 的资源路径（相对于 SFXRootResPath）
 
+        public bool Loop;
+
         public override string RowKey => Key;
     }
 }

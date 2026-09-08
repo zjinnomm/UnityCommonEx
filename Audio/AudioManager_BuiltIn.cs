@@ -23,13 +23,44 @@ namespace UnityCommonEx
 
         private readonly Queue<AudioSource> idleSources = new Queue<AudioSource>();
 
-        private struct PlayingSFX
+        private sealed class BuiltInSFXHandle : SFXHandle
         {
-            public AudioSource Source;
-            public float BaseVolume;
+            private AudioSource source;
+            private readonly AudioManager_BuiltIn owner;
+            private float volume;
+            public BuiltInSFXHandle(AudioManager_BuiltIn owner, AudioSource source, float volume)
+            {
+                this.owner = owner;
+                this.source = source;
+                this.volume = volume;
+            }
+            public override bool IsPlaying => !IsFinished && source != null && source.isPlaying;
+            public override void SetVolume(float value)
+            {
+                if (IsFinished) return;
+                volume = Mathf.Clamp01(value);
+                ApplyVolume();
+            }
+            public void ApplyVolume()
+            {
+                if (!IsFinished && source != null) source.volume = volume * owner.SFXVolume;
+            }
+            public override void SetPitch(float pitch) { if (!IsFinished && source != null) source.pitch = pitch; }
+            public override void SetPosition(Vector3 position)
+            {
+                if (IsFinished || source == null) return;
+                source.transform.position = position;
+                source.spatialBlend = 1f;
+            }
+            public override bool SetParameter(string name, float value) => false;
+            protected override void ReleasePlayback()
+            {
+                owner.RecycleAudioSource(source);
+                source = null;
+            }
         }
 
-        private readonly List<PlayingSFX> playingSources = new List<PlayingSFX>();
+        private readonly List<BuiltInSFXHandle> playingSources = new List<BuiltInSFXHandle>();
         private AudioSource bgmSource;
 
         protected override void OnInitializeBackend()
@@ -52,21 +83,22 @@ namespace UnityCommonEx
             bgmSource.volume = BGMVolume;
         }
 
-        protected override bool PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition)
+        protected override SFXHandle PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition)
         {
             AudioClip clip = GetOrLoadClip(key);
             if (clip == null)
             {
-                return false;
+                return null;
             }
 
             AudioSource source = GetAudioSource();
             if (source == null)
             {
-                return false;
+                return null;
             }
 
             source.clip = clip;
+            source.loop = sfxConfigTable.GetRow(key).Loop;
             source.pitch = pitch;
             source.volume = volume * SFXVolume;
             source.transform.position = worldPosition ?? transform.position;
@@ -77,8 +109,9 @@ namespace UnityCommonEx
             source.gameObject.SetActive(true);
             source.Play();
 
-            playingSources.Add(new PlayingSFX { Source = source, BaseVolume = volume });
-            return true;
+            var handle = new BuiltInSFXHandle(this, source, volume);
+            playingSources.Add(handle);
+            return handle;
         }
 
         protected override bool PlayBGMCore(string key, bool fadeIn)
@@ -132,14 +165,7 @@ namespace UnityCommonEx
 
         protected override void ApplySFXVolume(float volume)
         {
-            for (int i = 0; i < playingSources.Count; i++)
-            {
-                var src = playingSources[i].Source;
-                if (src != null && src.isPlaying)
-                {
-                    src.volume = playingSources[i].BaseVolume * volume;
-                }
-            }
+            foreach (var handle in playingSources) handle.ApplyVolume();
         }
 
         protected override bool IsBGMPlayingCore()
@@ -195,6 +221,8 @@ namespace UnityCommonEx
                 LogUtil.Warn("AudioManager_BuiltIn: SFX {0} not found in config", key);
                 return null;
             }
+
+            if (string.IsNullOrEmpty(row.Path)) return null;
 
             if (sfxHandles.TryGetValue(key, out var handle) && handle.IsValid())
             {
@@ -253,23 +281,19 @@ namespace UnityCommonEx
         {
             for (int i = playingSources.Count - 1; i >= 0; i--)
             {
-                var entry = playingSources[i];
-                if (entry.Source == null)
+                var handle = playingSources[i];
+                if (!handle.IsPlaying && !AudioListener.pause)
                 {
                     playingSources.RemoveAt(i);
-                    continue;
-                }
-
-                if (!entry.Source.isPlaying)
-                {
-                    RecycleAudioSource(entry.Source);
-                    playingSources.RemoveAt(i);
+                    handle.Finish(SFXEndReason.Completed);
                 }
             }
         }
-
         protected override void ReleaseBackend()
         {
+            var active = playingSources.ToArray();
+            playingSources.Clear();
+            foreach (var playback in active) playback.Finish(SFXEndReason.BackendReleased);
             foreach (var handle in sfxHandles.Values)
             {
                 if (handle.IsValid())
@@ -303,14 +327,6 @@ namespace UnityCommonEx
                 }
             }
 
-            for (int i = 0; i < playingSources.Count; i++)
-            {
-                var src = playingSources[i].Source;
-                if (src != null)
-                {
-                    Destroy(src.gameObject);
-                }
-            }
             playingSources.Clear();
         }
     }

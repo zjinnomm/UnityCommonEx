@@ -16,6 +16,7 @@ namespace UnityCommonEx
 
         protected string currentBGMKey;
         private bool initialized = false;
+        private bool releasing;
 
         protected override bool IsPersistent => true;
 
@@ -33,11 +34,11 @@ namespace UnityCommonEx
             ApplySFXVolume(SFXVolume);
         }
 
-        public bool PlaySFX(string key, float pitch = 1f, float volume = 1f)
+        public SFXHandle PlaySFX(string key, float pitch = 1f, float volume = 1f)
         {
-            if (string.IsNullOrEmpty(key))
+            if (releasing || string.IsNullOrEmpty(key))
             {
-                return false;
+                return null;
             }
 
             return PlaySFXCore(key, pitch, Mathf.Clamp01(volume), null);
@@ -46,11 +47,11 @@ namespace UnityCommonEx
         /// <summary>
         /// Plays an SFX at a world-space position so backends can provide directional audio.
         /// </summary>
-        public bool PlaySFXAtPosition(string key, Vector3 worldPosition, float pitch = 1f, float volume = 1f)
+        public SFXHandle PlaySFXAtPosition(string key, Vector3 worldPosition, float pitch = 1f, float volume = 1f)
         {
-            if (string.IsNullOrEmpty(key))
+            if (releasing || string.IsNullOrEmpty(key))
             {
-                return false;
+                return null;
             }
 
             return PlaySFXCore(key, pitch, Mathf.Clamp01(volume), worldPosition);
@@ -58,7 +59,7 @@ namespace UnityCommonEx
 
         public void PlayBGM(string key, bool fadeIn = false)
         {
-            if (string.IsNullOrEmpty(key))
+            if (releasing || string.IsNullOrEmpty(key))
             {
                 return;
             }
@@ -113,7 +114,7 @@ namespace UnityCommonEx
         }
 
         protected abstract void OnInitializeBackend();
-        protected abstract bool PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition);
+        protected abstract SFXHandle PlaySFXCore(string key, float pitch, float volume, Vector3? worldPosition);
         protected abstract bool PlayBGMCore(string key, bool fadeIn);
         protected abstract void StopBGMCore(bool fadeOut);
         protected abstract void PauseBGMCore();
@@ -125,6 +126,7 @@ namespace UnityCommonEx
 
         protected override void OnRelease()
         {
+            releasing = true;
             ReleaseBackend();
             currentBGMKey = null;
             initialized = false;
