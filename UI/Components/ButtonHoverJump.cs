@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace UnityCommonEx
 {
     public class ButtonHoverJump : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler,
-        IPointerDownHandler, IPointerUpHandler
+        IPointerDownHandler, IPointerUpHandler, ILayoutElement
     {
         public Button Button;
         public RectTransform Visual;
@@ -14,6 +14,18 @@ namespace UnityCommonEx
         public AnimationCurve JumpCurve;
         public float PressDepth = 3f;
         public float PressDuration = 0.07f;
+        public bool ForwardVisualLayout;
+
+        public float minWidth => ForwardVisualLayout && Visual != null ? LayoutUtility.GetMinWidth(Visual) : -1f;
+        public float preferredWidth => ForwardVisualLayout && Visual != null ? LayoutUtility.GetPreferredWidth(Visual) : -1f;
+        public float flexibleWidth => -1f;
+        public float minHeight => ForwardVisualLayout && Visual != null ? LayoutUtility.GetMinHeight(Visual) : -1f;
+        public float preferredHeight => ForwardVisualLayout && Visual != null ? LayoutUtility.GetPreferredHeight(Visual) : -1f;
+        public float flexibleHeight => -1f;
+        public int layoutPriority => 1;
+
+        public void CalculateLayoutInputHorizontal() { }
+        public void CalculateLayoutInputVertical() { }
 
         Vector2 restPosition;
         float startOffset;
