@@ -4,8 +4,10 @@ namespace UnityCommonEx
 {
     public interface IInputBindingSettingsManager
     {
+        bool IsGamepadSlot(string actionName, int slotIndex);
         bool HasPendingChanges { get; }
         bool IsRebinding { get; }
+        bool IsGamepadRebind { get; }
         int DisplayRevision { get; }
 
         IReadOnlyList<InputBinding> GetPendingBindings(string actionName);

@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 namespace UnityCommonEx
 {
@@ -8,15 +9,26 @@ namespace UnityCommonEx
     {
         public TAction Action;
         public int Priority;
+        public bool AllowWhenGamepadSuppressed;
         public Button Button;
         public ButtonSFXPlayer SFXPlayer;
         public Image BindingImage;
+        public TMP_Text BindingText;
         public InputBindingIconResourceConfig IconResourceConfig;
 
         TAction IInputActionWrapper<TAction>.Action => Action;
         int IInputActionWrapper<TAction>.Priority => Priority;
 
         protected abstract InputManager<TAction> GetInputManager();
+        private int lastDisplayRevision = -1;
+
+        private void Update()
+        {
+            var manager = GetInputManager();
+            if (manager == null || lastDisplayRevision == manager.DisplayRevision) return;
+            lastDisplayRevision = manager.DisplayRevision;
+            RefreshBindingImage(manager);
+        }
 
         private void OnEnable()
         {
@@ -49,10 +61,16 @@ namespace UnityCommonEx
 
         protected virtual void RefreshBindingImage(InputManager<TAction> inputManager)
         {
+            InputBinding binding = inputManager?.GetDisplayBinding(Action);
+            InputBindingIconResourceConfig.Entry entry = binding != null && IconResourceConfig != null
+                ? IconResourceConfig.GetEntry(binding.GetBindingKey()) : null;
+            if (BindingText != null)
+            {
+                BindingText.gameObject.SetActive(binding != null && (BindingImage == null || entry?.Sprite == null));
+                BindingText.text = binding?.GetDisplayText() ?? string.Empty;
+            }
             if (BindingImage == null)
                 return;
-
-            InputBinding binding = inputManager?.GetPendingBinding(Action, 0);
             if (binding == null || IconResourceConfig == null)
             {
                 BindingImage.sprite = null;
@@ -60,7 +78,6 @@ namespace UnityCommonEx
                 return;
             }
 
-            InputBindingIconResourceConfig.Entry entry = IconResourceConfig.GetEntry(binding.GetBindingKey());
             BindingImage.sprite = entry != null ? entry.Sprite : null;
             BindingImage.enabled = BindingImage.sprite != null;
 

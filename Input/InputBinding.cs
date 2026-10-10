@@ -1,6 +1,7 @@
 using System;
 using Newtonsoft.Json;
 using UnityEngine;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace UnityCommonEx
 {
@@ -20,6 +21,31 @@ namespace UnityCommonEx
         public InputBindingTriggerType TriggerType;
         [JsonProperty(Required = Required.Default)]
         public bool Rebindable = true;
+
+        [JsonProperty(Required = Required.Default)]
+        [JsonConverter(typeof(GamepadButtonJsonConverter))]
+        public GamepadButton GamepadButton;
+
+        [JsonProperty("GamepadControl", Required = Required.Default)]
+        private string LegacyGamepadControl
+        {
+            set
+            {
+                if (string.IsNullOrEmpty(value)) return;
+                if (!InputDeviceState.TryParseButtonPath(value, out var button))
+                    throw new JsonSerializationException("Unknown legacy gamepad button: " + value);
+                GamepadButton = button;
+            }
+        }
+
+        [JsonIgnore]
+        public bool IsGamepad => DeviceType == InputBindingDeviceType.GamepadButton;
+
+        public static InputBinding Gamepad(GamepadButton button, InputBindingTriggerType triggerType)
+        {
+            return new InputBinding { DeviceType = InputBindingDeviceType.GamepadButton,
+                GamepadButton = button, TriggerType = triggerType };
+        }
 
         public static InputBinding Keyboard(KeyCode key, InputBindingTriggerType triggerType)
         {
@@ -66,6 +92,7 @@ namespace UnityCommonEx
                 DeviceType = DeviceType,
                 Key = Key,
                 MouseButton = MouseButton,
+                GamepadButton = GamepadButton,
                 TriggerType = TriggerType,
                 Rebindable = Rebindable
             };
@@ -75,6 +102,8 @@ namespace UnityCommonEx
         {
             switch (DeviceType)
             {
+                case InputBindingDeviceType.GamepadButton:
+                    return "Gamepad:" + InputDeviceState.GetButtonPath(GamepadButton);
                 case InputBindingDeviceType.KeyboardKey:
                     return "Keyboard:" + Key;
                 case InputBindingDeviceType.MouseButton:
@@ -92,6 +121,8 @@ namespace UnityCommonEx
         {
             switch (DeviceType)
             {
+                case InputBindingDeviceType.GamepadButton:
+                    return InputDeviceState.GetButtonLabel(GamepadButton);
                 case InputBindingDeviceType.KeyboardKey:
                     return Key.ToString();
                 case InputBindingDeviceType.MouseButton:
@@ -116,6 +147,7 @@ namespace UnityCommonEx
                 DeviceType == other.DeviceType &&
                 Key == other.Key &&
                 MouseButton == other.MouseButton &&
+                GamepadButton == other.GamepadButton &&
                 TriggerType == other.TriggerType &&
                 Rebindable == other.Rebindable;
         }
@@ -130,10 +162,15 @@ namespace UnityCommonEx
             return DeviceType == InputBindingDeviceType.MouseButton && MouseButton == mouseButton;
         }
 
-        public bool IsTriggeredThisFrame()
+        public bool IsTriggeredThisFrame(bool ignoreGamepadSuppression = false)
         {
             switch (DeviceType)
             {
+                case InputBindingDeviceType.GamepadButton:
+                    if (InputDeviceState.SuppressGamepadActions && !ignoreGamepadSuppression) return false;
+                    var button = InputDeviceState.GetButton(GamepadButton);
+                    return button != null && EvaluateDigital(button.wasPressedThisFrame,
+                        button.isPressed, button.wasReleasedThisFrame, button.wasPressedThisFrame);
                 case InputBindingDeviceType.KeyboardKey:
                     return EvaluateDigital(
                         Input.GetKeyDown(Key),
@@ -155,6 +192,9 @@ namespace UnityCommonEx
         {
             switch (DeviceType)
             {
+                case InputBindingDeviceType.GamepadButton:
+                    return !InputDeviceState.SuppressGamepadActions &&
+                        InputDeviceState.GetButton(GamepadButton)?.isPressed == true;
                 case InputBindingDeviceType.KeyboardKey:
                     return Input.GetKey(Key);
                 case InputBindingDeviceType.MouseButton:

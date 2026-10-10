@@ -23,6 +23,7 @@ namespace UnityCommonEx
 
         [FormerlySerializedAs("TabPrefab")]
         public GameObject CategoryTabPrefab;
+        public ControllerTabNavigation ControllerTabs;
 
         private GameSettingTemplate currentTemplate;
         private IGameSettingManager currentManager;
@@ -65,6 +66,8 @@ namespace UnityCommonEx
             {
                 for (int i = 0; i < categories.Count; i++)
                     CreateCategoryTab(categories[i]);
+
+                ControllerTabs?.SetTabs(categories.Select(category => categoryTabs[category.CategoryName].InteractiveButton).ToArray());
 
                 ShowCategory(categories[0].CategoryName);
                 return;
@@ -160,6 +163,7 @@ namespace UnityCommonEx
             }
 
             tab.name = "Tab_" + category.CategoryName;
+            if (tab.ControllerFocus != null) tab.ControllerFocus.RegionRoot = CategoryTabRoot;
             tab.SetItem(GameSettingFieldConfig.GetDisplayText(category.DisplayName, category.CategoryName));
             tab.OnDeselected();
             if (tab.InteractiveButton != null)
@@ -171,6 +175,8 @@ namespace UnityCommonEx
         {
             foreach (KeyValuePair<string, CommonSelectableListItemUIController> kv in categoryTabs)
             {
+                if (kv.Key == selectedCategoryName && ControllerTabs != null)
+                    ControllerTabs.SetSelectedIndex(System.Array.IndexOf(ControllerTabs.Tabs, kv.Value.InteractiveButton));
                 if (kv.Value == null)
                     continue;
 

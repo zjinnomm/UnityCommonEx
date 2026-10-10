@@ -6,5 +6,6 @@ namespace UnityCommonEx
         MouseButton,
         MouseWheelUp,
         MouseWheelDown,
+        GamepadButton,
     }
 }

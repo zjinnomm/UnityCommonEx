@@ -95,6 +95,8 @@ namespace UnityCommonEx
     public class InputBindingGameSettingFieldConfig : GameSettingFieldConfig
     {
         [JsonProperty(Required = Required.Default)]
+        public bool GamepadOnly;
+        [JsonProperty(Required = Required.Default)]
         public string Action;
     }
 }

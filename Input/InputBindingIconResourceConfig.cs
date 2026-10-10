@@ -24,6 +24,10 @@ namespace UnityCommonEx
             if (_cache == null)
                 Initialize();
 
+            if (!string.IsNullOrEmpty(bindingKey) && bindingKey.StartsWith("Gamepad:") &&
+                _cache.TryGetValue("Gamepad:" + InputDeviceState.GamepadFamily + ":" + bindingKey.Substring(8), out Entry deviceEntry))
+                return deviceEntry;
+
             if (!string.IsNullOrEmpty(bindingKey) && _cache.TryGetValue(bindingKey, out Entry entry))
                 return entry;
 

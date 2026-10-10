@@ -34,6 +34,7 @@ namespace UnityCommonEx
             {
                 var controller = Create<UIListItemController>(ChildPrefab, transform);
                 controller.Parent = this;
+                if (controller.ControllerFocus != null) controller.ControllerFocus.RegionRoot = transform;
                 controllers.Add(controller);
             }
             while (controllers.Count > expectedNum)
@@ -84,6 +85,8 @@ namespace UnityCommonEx
 
         [HideInInspector]
         public UIListController Parent;
+
+        public ControllerFocusTarget ControllerFocus;
 
         public virtual void OnClick()
         {

@@ -15,6 +15,7 @@ namespace UnityCommonEx
     {
         public Slider Slider;
         public TMP_Text NumberText;
+        public ControllerFocusTarget ControllerFocus;
 
         private NumberGameSettingFieldConfig _config;
         private bool _suppressCallback;
@@ -42,6 +43,7 @@ namespace UnityCommonEx
         public override void SetConfig(NumberGameSettingFieldConfig config)
         {
             _config = config;
+            if (ControllerFocus != null) ControllerFocus.SliderStep = config.Step;
             ApplySliderConfig();
             _value = Snap(Clamp(_value));
             RefreshUI();

@@ -1,3 +1,4 @@
+using UnityEngine.InputSystem.LowLevel;
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -22,6 +23,7 @@ namespace UnityCommonEx
             public InputBindingTriggerType TriggerType;
             public bool Rebindable = true;
             public int StartedFrame;
+            public bool GamepadOnly;
         }
 
         private static readonly IReadOnlyList<InputBinding> EmptyBindings = Array.Empty<InputBinding>();
@@ -35,6 +37,7 @@ namespace UnityCommonEx
         private readonly Dictionary<TAction, List<ActionListener>> listenersByAction = new Dictionary<TAction, List<ActionListener>>();
         private readonly Dictionary<TAction, List<IInputActionWrapper<TAction>>> wrappersByAction = new Dictionary<TAction, List<IInputActionWrapper<TAction>>>();
         private readonly HashSet<TAction> triggeredActions = new HashSet<TAction>();
+        private readonly HashSet<TAction> handledActions = new HashSet<TAction>();
         private readonly List<TAction> actionScratch = new List<TAction>();
         private string overridePath;
         private bool initialized;
@@ -44,7 +47,38 @@ namespace UnityCommonEx
         public static InputManager<TAction> Instance => _instance;
         public bool HasPendingChanges => !AreBindingSetsEqual(pendingBindingsByAction, committedBindingsByAction);
         public bool IsRebinding => activeRebind != null;
-        public int DisplayRevision => displayRevision;
+        public bool IsGamepadRebind => activeRebind?.GamepadOnly == true;
+        public bool AllowSuppressedGamepadUIWrappers { get; set; }
+        public bool WasHandledThisFrame(TAction action) => handledActions.Contains(action);
+        public int DisplayRevision => displayRevision + InputDeviceState.Revision;
+
+        public InputBinding GetDisplayBinding(TAction action)
+        {
+            foreach (var binding in GetPendingBindings(action))
+                if (binding != null && binding.IsGamepad == InputDeviceState.UsingGamepad)
+                    return binding;
+            return null;
+        }
+
+        public bool GamepadPressed(TAction action)
+        {
+            if (!committedBindingsByAction.TryGetValue(action, out var bindings)) return false;
+            foreach (var binding in bindings)
+                if (binding?.IsGamepad == true &&
+                    InputDeviceState.GetButton(binding.GamepadButton)?.wasPressedThisFrame == true)
+                    return true;
+            return false;
+        }
+
+        protected virtual bool CanBindingsConflict(TAction left, TAction right) => true;
+        protected virtual bool IsReservedBinding(TAction action, InputBinding binding) => false;
+        protected virtual bool CanCaptureGamepadButton(GamepadButton button) => true;
+
+        public bool IsGamepadSlot(string actionName, int slotIndex)
+        {
+            if (!TryParseAction(actionName, out TAction action)) return false;
+            return (GetPendingBinding(action, slotIndex) ?? GetDefaultBinding(action, slotIndex))?.IsGamepad == true;
+        }
 
         protected InputManager()
         {
@@ -63,6 +97,7 @@ namespace UnityCommonEx
             pendingBindingsByAction.Clear();
             triggeredBindingsByAction.Clear();
             triggeredActions.Clear();
+            handledActions.Clear();
             overridePath = inputOverridePath;
             activeRebind = null;
             InputBindingSettingsRegistry.ActiveManager = this;
@@ -231,7 +266,8 @@ namespace UnityCommonEx
                 TriggerType = binding != null ? binding.TriggerType :
                     (defaultBinding != null ? defaultBinding.TriggerType : InputBindingTriggerType.Pressed),
                 Rebindable = binding != null ? binding.Rebindable : (defaultBinding == null || defaultBinding.Rebindable),
-                StartedFrame = Time.frameCount
+                StartedFrame = Time.frameCount,
+                GamepadOnly = (binding ?? defaultBinding)?.IsGamepad == true
             };
 
             MarkDisplayDirty();
@@ -240,14 +276,12 @@ namespace UnityCommonEx
 
         public void ProcessInput(bool suppressActions = false)
         {
-            if (!initialized || activeRebind != null)
-                return;
-
             triggeredActions.Clear();
+            handledActions.Clear();
             foreach (var kvp in triggeredBindingsByAction)
                 kvp.Value.Clear();
 
-            if (suppressActions)
+            if (!initialized || activeRebind != null || suppressActions)
                 return;
             actionScratch.Clear();
             foreach (var kvp in committedBindingsByAction)
@@ -258,13 +292,17 @@ namespace UnityCommonEx
                 if (!committedBindingsByAction.TryGetValue(action, out var bindings) || bindings == null || bindings.Count == 0)
                     continue;
 
+                var topWrapper = FindTopWrapper(action);
+                bool allowGamepad = AllowSuppressedGamepadUIWrappers && topWrapper != null &&
+                    topWrapper is ButtonInputActionWrapper<TAction> uiButton && uiButton.AllowWhenGamepadSuppressed &&
+                    InputScopeRegistry.ResolveScope(topWrapper, InputScope.World) >= InputScope.UI;
                 List<InputBinding> triggeredBindings = GetOrCreateTriggeredBindingList(action);
                 triggeredBindings.Clear();
 
                 for (int i = 0; i < bindings.Count; i++)
                 {
                     InputBinding binding = bindings[i];
-                    if (binding != null && binding.IsTriggeredThisFrame())
+                    if (binding != null && binding.IsTriggeredThisFrame(allowGamepad))
                         triggeredBindings.Add(binding);
                 }
 
@@ -272,8 +310,12 @@ namespace UnityCommonEx
                     continue;
 
                 triggeredActions.Add(action);
-                if (TryTriggerTopWrapper(action))
+                if (topWrapper != null)
+                {
+                    handledActions.Add(action);
+                    topWrapper.Trigger();
                     continue;
+                }
                 NotifyListeners(action);
             }
         }
@@ -321,6 +363,21 @@ namespace UnityCommonEx
 
             bool canConsumeMouseControl = Time.frameCount > activeRebind.StartedFrame;
 
+            if (!canConsumeMouseControl) return false;
+            if (InputDeviceState.GetButton(GamepadButton.East)?.wasPressedThisFrame == true)
+            {
+                CancelRebind();
+                return true;
+            }
+            if (InputDeviceState.GetButton(GamepadButton.LeftStick)?.isPressed == true &&
+                InputDeviceState.GetButton(GamepadButton.RightStick)?.wasPressedThisFrame == true)
+            {
+                result = ClearPendingBinding(activeRebind.Action, activeRebind.SlotIndex);
+                activeRebind = null;
+                MarkDisplayDirty();
+                return true;
+            }
+
             if (canConsumeMouseControl && Input.GetMouseButtonDown(0))
             {
                 result = new InputBindingSetResult
@@ -347,7 +404,8 @@ namespace UnityCommonEx
                 return false;
 
             result = TrySetPendingBinding(activeRebind.Action, activeRebind.SlotIndex, binding);
-            activeRebind = null;
+            if (result.Success) activeRebind = null;
+            else activeRebind.StartedFrame = Time.frameCount;
             MarkDisplayDirty();
             return true;
         }
@@ -544,6 +602,18 @@ namespace UnityCommonEx
             if (binding == null)
                 return ClearPendingBinding(action, slotIndex);
 
+            if (binding.IsGamepad && InputDeviceState.GetButtonPath(binding.GamepadButton) == null)
+            {
+                result.Message = "Unknown controller button.";
+                return result;
+            }
+
+            if (IsReservedBinding(action, binding))
+            {
+                result.Message = "This controller button is reserved for menu navigation.";
+                return result;
+            }
+
             var conflicts = FindConflicts(action, slotIndex, binding);
             if (conflicts.HasLockedConflict)
             {
@@ -623,6 +693,7 @@ namespace UnityCommonEx
 
             foreach (var kv in pendingBindingsByAction)
             {
+                if (!CanBindingsConflict(action, kv.Key)) continue;
                 List<InputBinding> bindings = kv.Value;
                 if (bindings == null)
                     continue;
@@ -668,6 +739,10 @@ namespace UnityCommonEx
                 {
                     InputBindingOverrideEntry<TAction> entry = profile.Overrides[i];
                     if (entry == null || entry.SlotIndex < 0)
+                        continue;
+                    if (GetDefaultBinding(entry.Action, entry.SlotIndex)?.Rebindable == false)
+                        continue;
+                    if (entry.Binding != null && IsReservedBinding(entry.Action, entry.Binding))
                         continue;
 
                     List<InputBinding> committedBindings = GetOrCreateBindingList(committedBindingsByAction, entry.Action);
@@ -821,10 +896,23 @@ namespace UnityCommonEx
             if (state == null)
                 return false;
 
+            if (state.GamepadOnly)
+            {
+                foreach (var button in InputDeviceState.Buttons)
+                {
+                    if (!CanCaptureGamepadButton(button)) continue;
+                    if (InputDeviceState.GetButton(button)?.wasPressedThisFrame != true) continue;
+                    binding = InputBinding.Gamepad(button, state.TriggerType);
+                    binding.Rebindable = state.Rebindable;
+                    return true;
+                }
+                return false;
+            }
+
             for (int i = 0; i < CapturableKeys.Length; i++)
             {
                 KeyCode key = CapturableKeys[i];
-                if (!Input.GetKeyDown(key))
+                if (key >= KeyCode.JoystickButton0 || !Input.GetKeyDown(key))
                     continue;
 
                 binding = InputBinding.Keyboard(key, state.TriggerType);
@@ -866,10 +954,10 @@ namespace UnityCommonEx
             }
         }
 
-        private bool TryTriggerTopWrapper(TAction action)
+        private IInputActionWrapper<TAction> FindTopWrapper(TAction action)
         {
             if (!wrappersByAction.TryGetValue(action, out var wrappers) || wrappers == null || wrappers.Count == 0)
-                return false;
+                return null;
 
             InputScope currentScope = InputScopeRegistry.CurrentScope;
             IInputActionWrapper<TAction> topWrapper = null;
@@ -892,11 +980,7 @@ namespace UnityCommonEx
                     topWrapper = wrapper;
             }
 
-            if (topWrapper == null)
-                return false;
-
-            topWrapper.Trigger();
-            return true;
+            return topWrapper;
         }
 
         private static bool IsDeadUnityObject(object owner)

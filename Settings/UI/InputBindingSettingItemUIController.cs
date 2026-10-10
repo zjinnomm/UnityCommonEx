@@ -13,6 +13,7 @@ namespace UnityCommonEx
         private InputBindingGameSettingFieldConfig _config;
         private IInputBindingSettingsManager _manager;
         private int _lastDisplayRevision = -1;
+        private readonly List<int> slotIndices = new List<int>();
 
         private void Update()
         {
@@ -67,7 +68,11 @@ namespace UnityCommonEx
 
             int maxSlots = GetSlotCapacity();
             IReadOnlyList<InputBinding> bindings = _manager.GetPendingBindings(_config.Action);
-            int visibleSlotCount = bindings != null ? bindings.Count : 0;
+            slotIndices.Clear();
+            if (bindings != null)
+                for (int slot = 0; slot < bindings.Count; slot++)
+                    if (_manager.IsGamepadSlot(_config.Action, slot) == _config.GamepadOnly) slotIndices.Add(slot);
+            int visibleSlotCount = slotIndices.Count;
             for (int i = 0; i < maxSlots; i++)
             {
                 Button button = GetButton(i);
@@ -82,8 +87,10 @@ namespace UnityCommonEx
                 if (!visible)
                     continue;
 
-                InputBinding binding = i < bindings.Count ? bindings[i] : null;
-                ApplyBindingVisual(button, image, binding, _manager.IsRebindingTarget(_config.Action, i));
+                int bindingIndex = slotIndices[i];
+                InputBinding binding = bindings[bindingIndex];
+                bool listening = _manager.IsRebindingTarget(_config.Action, bindingIndex);
+                ApplyBindingVisual(button, image, binding, listening);
             }
         }
 
@@ -93,8 +100,10 @@ namespace UnityCommonEx
                 return;
 
             IReadOnlyList<InputBinding> bindings = _manager.GetPendingBindings(_config.Action);
+            if (slotIndex < 0 || slotIndex >= slotIndices.Count) return;
+            slotIndex = slotIndices[slotIndex];
             InputBinding binding = slotIndex < bindings.Count ? bindings[slotIndex] : null;
-            if (binding != null && binding.DeviceType != InputBindingDeviceType.KeyboardKey)
+            if (binding != null && !binding.Rebindable)
                 return;
 
             _manager.BeginRebind(_config.Action, slotIndex);
@@ -104,7 +113,7 @@ namespace UnityCommonEx
         private void ApplyBindingVisual(Button button, Image image, InputBinding binding, bool isListening)
         {
             if (button != null)
-                button.interactable = binding == null || binding.DeviceType == InputBindingDeviceType.KeyboardKey;
+                button.interactable = binding == null || binding.Rebindable;
 
             if (image == null)
                 return;
