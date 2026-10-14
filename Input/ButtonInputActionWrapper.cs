@@ -21,12 +21,16 @@ namespace UnityCommonEx
 
         protected abstract InputManager<TAction> GetInputManager();
         private int lastDisplayRevision = -1;
+        private bool lastShortcutAvailable;
 
-        private void Update()
+        private void LateUpdate()
         {
             var manager = GetInputManager();
-            if (manager == null || lastDisplayRevision == manager.DisplayRevision) return;
-            lastDisplayRevision = manager.DisplayRevision;
+            bool available = manager?.CanTriggerWrapper(this, InputDeviceState.UsingGamepad) == true;
+            int revision = manager?.DisplayRevision ?? -1;
+            if (lastDisplayRevision == revision && lastShortcutAvailable == available) return;
+            lastDisplayRevision = revision;
+            lastShortcutAvailable = available;
             RefreshBindingImage(manager);
         }
 
@@ -34,12 +38,15 @@ namespace UnityCommonEx
         {
             InputManager<TAction> inputManager = GetInputManager();
             inputManager?.RegisterWrapper(this);
+            lastDisplayRevision = -1;
             RefreshBindingImage(inputManager);
         }
 
         private void OnDisable()
         {
             GetInputManager()?.UnregisterWrapper(this);
+            if (BindingImage != null) BindingImage.enabled = false;
+            if (BindingText != null) BindingText.gameObject.SetActive(false);
         }
 
         public virtual bool CanTrigger()
@@ -61,7 +68,8 @@ namespace UnityCommonEx
 
         protected virtual void RefreshBindingImage(InputManager<TAction> inputManager)
         {
-            InputBinding binding = inputManager?.GetDisplayBinding(Action);
+            InputBinding binding = inputManager?.CanTriggerWrapper(this, InputDeviceState.UsingGamepad) == true
+                ? inputManager.GetCommittedBinding(Action, InputDeviceState.UsingGamepad) : null;
             InputBindingIconResourceConfig.Entry entry = binding != null && IconResourceConfig != null
                 ? IconResourceConfig.GetEntry(binding.GetBindingKey()) : null;
             if (BindingText != null)

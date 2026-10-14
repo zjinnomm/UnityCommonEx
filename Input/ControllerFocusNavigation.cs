@@ -22,6 +22,8 @@ namespace UnityCommonEx
         private int lastLayer = -1;
         private ControllerTabNavigation focusedTabs;
         private int focusedTabIndex;
+        private InputScope currentScope;
+        private readonly Vector3[] scrollCorners = new Vector3[4];
         public bool NeedsContentFocusRestore => focusedTabs != null && focusedTabs.SelectedIndex != focusedTabIndex;
 
         public IReadOnlyList<ControllerFocusTarget> Targets => targets;
@@ -68,6 +70,7 @@ namespace UnityCommonEx
 
         public void RefreshTargets(InputScope scope, int modalLayerThreshold)
         {
+            currentScope = scope;
             staleTabMemories.Clear();
             foreach (var memory in tabMemories)
                 if (memory.Key.Item1 == null || memory.Value == null) staleTabMemories.Add(memory.Key);
@@ -91,11 +94,13 @@ namespace UnityCommonEx
             Rect screen = new Rect(0f, 0f, Screen.width, Screen.height);
             if (target.ScreenRect.Overlaps(screen)) return true;
             var scroll = target.GetComponentInParent<ScrollRect>();
-            if (scroll?.viewport == null) return false;
-            var canvas = scroll.viewport.GetComponentInParent<Canvas>();
+            if (scroll == null) return false;
+            var viewport = ControllerFocusTarget.GetViewport(scroll);
+            if (viewport == null) return false;
+            var canvas = viewport.GetComponentInParent<Canvas>();
             var camera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
             var corners = new Vector3[4];
-            scroll.viewport.GetWorldCorners(corners);
+            viewport.GetWorldCorners(corners);
             Vector2 min = RectTransformUtility.WorldToScreenPoint(camera, corners[0]);
             Vector2 max = RectTransformUtility.WorldToScreenPoint(camera, corners[2]);
             return Rect.MinMaxRect(min.x, min.y, max.x, max.y).Overlaps(screen);
@@ -172,6 +177,7 @@ namespace UnityCommonEx
         public void MoveFocus(Vector2 direction)
         {
             if (focused == null) { SetFocus(InitialTarget()); return; }
+            if (!focused.IsVisibleInViewport) { RestoreVisibleFocus(); return; }
             if (focused.Control is Slider slider && direction.x != 0f)
             {
                 slider.value += direction.x * (focused.SliderStep > 0f ? focused.SliderStep :
@@ -215,18 +221,76 @@ namespace UnityCommonEx
                 if (target.RegionRoot == region) { SetFocus(target); return; }
         }
 
+        public bool TryGetFocusedScrollRect(out ScrollRect scroll)
+        {
+            scroll = focused != null ? focused.GetScrollTarget() : null;
+            if (focused == null || !focused.CanFocus || !targets.Contains(focused) ||
+                scroll == null || !scroll.isActiveAndEnabled || scroll.content == null ||
+                ControllerFocusTarget.GetViewport(scroll) == null ||
+                InputScopeRegistry.ResolveScope(scroll, InputScope.UI) != currentScope) return false;
+            int scrollLayer = 0;
+            foreach (var canvas in scroll.GetComponentsInParent<Canvas>()) scrollLayer = Mathf.Max(scrollLayer, canvas.sortingOrder);
+            if (scrollLayer != focused.Layer) return false;
+            foreach (var group in scroll.GetComponentsInParent<CanvasGroup>())
+            {
+                if (!group.interactable || group.alpha < 0.01f) return false;
+                if (group.ignoreParentGroups) break;
+            }
+            return ScrollableDistance(scroll) != Vector2.zero;
+        }
+
+        private Vector2 ScrollableDistance(ScrollRect scroll)
+        {
+            var viewport = ControllerFocusTarget.GetViewport(scroll);
+            Bounds bounds = ControllerFocusTarget.GetRectBounds(scroll.content, viewport, scrollCorners);
+            return new Vector2(scroll.horizontal && bounds.size.x > viewport.rect.width + 0.5f
+                    ? bounds.size.x - viewport.rect.width : 0f,
+                scroll.vertical && bounds.size.y > viewport.rect.height + 0.5f
+                    ? bounds.size.y - viewport.rect.height : 0f);
+        }
+
         public void ScrollFocused(Vector2 value, float speed, float deltaTime)
         {
-            var scroll = focused != null ? focused.GetComponentInParent<ScrollRect>() : null;
-            if (scroll == null || scroll.content == null || scroll.viewport == null) return;
-            float distance = scroll.content.rect.height - scroll.viewport.rect.height;
-            if (scroll.vertical && distance > 0f)
+            if (!TryGetFocusedScrollRect(out var scroll)) return;
+            Vector2 distance = ScrollableDistance(scroll);
+            if ((distance.x <= 0f || value.x == 0f) && (distance.y <= 0f || value.y == 0f)) return;
+            scroll.StopMovement();
+            if (distance.y > 0f && value.y != 0f)
                 scroll.verticalNormalizedPosition = Mathf.Clamp01(scroll.verticalNormalizedPosition +
-                    value.y * speed * deltaTime / distance);
-            float width = scroll.content.rect.width - scroll.viewport.rect.width;
-            if (scroll.horizontal && width > 0f)
+                    value.y * speed * deltaTime / distance.y);
+            if (distance.x > 0f && value.x != 0f)
                 scroll.horizontalNormalizedPosition = Mathf.Clamp01(scroll.horizontalNormalizedPosition +
-                    value.x * speed * deltaTime / width);
+                    value.x * speed * deltaTime / distance.x);
+            RefreshFocusVisibility();
+        }
+
+        public void RefreshFocusVisibility()
+        {
+            if (focused == null || pointer == null) return;
+            bool visible = focused.IsAvailable && focused.IsVisibleInViewport;
+            pointer.position = focused.ScreenPosition;
+            if (focused.IsFocused == visible) return;
+            focused.Focus(visible, pointer);
+            EventSystem.SetSelectedGameObject(visible && focused.Control != null && !(focused.Control is TMP_InputField)
+                ? focused.Control.gameObject : null);
+        }
+
+        public void RestoreVisibleFocus()
+        {
+            if (focused == null || focused.IsVisibleInViewport) return;
+            ControllerFocusTarget result = null;
+            float bestScore = float.MaxValue;
+            var scroll = focused.GetScrollTarget();
+            foreach (var candidate in targets)
+            {
+                if (!candidate.IsVisibleInViewport) continue;
+                float score = (candidate.ScreenPosition - lastFocusPosition).sqrMagnitude;
+                if (candidate.GetScrollTarget() != scroll) score += Screen.width * Screen.width + Screen.height * Screen.height;
+                if (score >= bestScore) continue;
+                bestScore = score;
+                result = candidate;
+            }
+            if (result != null) SetFocus(result);
         }
     }
 }

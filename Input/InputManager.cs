@@ -2,6 +2,7 @@ using UnityEngine.InputSystem.LowLevel;
 using System;
 using System.IO;
 using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 namespace UnityCommonEx
@@ -41,6 +42,7 @@ namespace UnityCommonEx
         private readonly List<TAction> actionScratch = new List<TAction>();
         private string overridePath;
         private bool initialized;
+        private bool actionsSuppressed;
         private RebindState activeRebind;
         private int displayRevision;
 
@@ -57,6 +59,14 @@ namespace UnityCommonEx
             foreach (var binding in GetPendingBindings(action))
                 if (binding != null && binding.IsGamepad == InputDeviceState.UsingGamepad)
                     return binding;
+            return null;
+        }
+
+        public InputBinding GetCommittedBinding(TAction action, bool gamepad)
+        {
+            if (!committedBindingsByAction.TryGetValue(action, out var bindings)) return null;
+            foreach (var binding in bindings)
+                if (binding != null && binding.IsGamepad == gamepad) return binding;
             return null;
         }
 
@@ -100,6 +110,7 @@ namespace UnityCommonEx
             handledActions.Clear();
             overridePath = inputOverridePath;
             activeRebind = null;
+            actionsSuppressed = false;
             InputBindingSettingsRegistry.ActiveManager = this;
             displayRevision = 0;
 
@@ -276,6 +287,7 @@ namespace UnityCommonEx
 
         public void ProcessInput(bool suppressActions = false)
         {
+            actionsSuppressed = suppressActions;
             triggeredActions.Clear();
             handledActions.Clear();
             foreach (var kvp in triggeredBindingsByAction)
@@ -293,9 +305,7 @@ namespace UnityCommonEx
                     continue;
 
                 var topWrapper = FindTopWrapper(action);
-                bool allowGamepad = AllowSuppressedGamepadUIWrappers && topWrapper != null &&
-                    topWrapper is ButtonInputActionWrapper<TAction> uiButton && uiButton.AllowWhenGamepadSuppressed &&
-                    InputScopeRegistry.ResolveScope(topWrapper, InputScope.World) >= InputScope.UI;
+                bool allowGamepad = AllowsSuppressedGamepadInput(topWrapper);
                 List<InputBinding> triggeredBindings = GetOrCreateTriggeredBindingList(action);
                 triggeredBindings.Clear();
 
@@ -318,6 +328,19 @@ namespace UnityCommonEx
                 }
                 NotifyListeners(action);
             }
+        }
+
+        private bool AllowsSuppressedGamepadInput(IInputActionWrapper<TAction> wrapper) =>
+            AllowSuppressedGamepadUIWrappers && wrapper is ButtonInputActionWrapper<TAction> uiButton &&
+            uiButton.AllowWhenGamepadSuppressed && InputScopeRegistry.ResolveScope(wrapper, InputScope.World) >= InputScope.UI;
+
+        public bool CanTriggerWrapper(IInputActionWrapper<TAction> wrapper, bool gamepad)
+        {
+            if (!initialized || actionsSuppressed || activeRebind != null || wrapper == null ||
+                GetCommittedBinding(wrapper.Action, gamepad) == null ||
+                !ReferenceEquals(FindTopWrapper(wrapper.Action), wrapper)) return false;
+            return !gamepad || (InputDeviceState.Gamepad != null &&
+                (!InputDeviceState.SuppressGamepadActions || AllowsSuppressedGamepadInput(wrapper)));
         }
 
         public bool WasTriggeredThisFrame(
@@ -730,8 +753,18 @@ namespace UnityCommonEx
 
             try
             {
+                var profileJson = JsonUtil.Read<JObject>(overridePath, JsonReadFailureMode.Warning);
+                if (!(profileJson?.GetValue("Overrides", StringComparison.OrdinalIgnoreCase) is JArray overridesJson))
+                    return;
+                // Removed actions must not invalidate overrides for the remaining actions.
+                for (int i = overridesJson.Count - 1; i >= 0; i--)
+                {
+                    var actionName = (overridesJson[i] as JObject)?.GetValue("Action", StringComparison.OrdinalIgnoreCase);
+                    if (actionName == null || !Enum.TryParse(actionName.ToString(), true, out TAction action) ||
+                        !Enum.IsDefined(typeof(TAction), action)) overridesJson.RemoveAt(i);
+                }
                 InputBindingOverrideProfile<TAction> profile =
-                    JsonUtil.Read<InputBindingOverrideProfile<TAction>>(overridePath, JsonReadFailureMode.Warning);
+                    JsonUtil.ReadRaw<InputBindingOverrideProfile<TAction>>(profileJson.ToString());
                 if (profile?.Overrides == null)
                     return;
 
@@ -954,7 +987,7 @@ namespace UnityCommonEx
             }
         }
 
-        private IInputActionWrapper<TAction> FindTopWrapper(TAction action)
+        public IInputActionWrapper<TAction> FindTopWrapper(TAction action)
         {
             if (!wrappersByAction.TryGetValue(action, out var wrappers) || wrappers == null || wrappers.Count == 0)
                 return null;

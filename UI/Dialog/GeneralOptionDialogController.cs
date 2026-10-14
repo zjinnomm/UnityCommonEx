@@ -11,6 +11,7 @@ namespace UnityCommonEx
         public Sprite Icon;
         public Action Callback;
         public bool Interactable = true;
+        public bool IsCancelOption;
     }
 
     public struct GeneralOptionDialogConfig
@@ -27,6 +28,8 @@ namespace UnityCommonEx
         public RichButtonController Button1;
         public RichButtonController Button2;
         public RichButtonController Button3;
+        public Behaviour[] CancelInputWrappers;
+        public Behaviour[] ExitInputWrappers;
 
         private const int ButtonSlotCount = 3;
         private readonly Action[] callbacks = new Action[ButtonSlotCount];
@@ -58,6 +61,7 @@ namespace UnityCommonEx
                 return;
 
             bool visible = config != null && !string.IsNullOrEmpty(config.Title);
+            SetCancelShortcuts(index, visible && config.IsCancelOption);
             button.gameObject.SetActive(visible);
             callbacks[index] = visible ? config.Callback : null;
             if (!visible)
@@ -86,7 +90,18 @@ namespace UnityCommonEx
             }
 
             for (int i = 0; i < callbacks.Length; i++)
+            {
                 callbacks[i] = null;
+                SetCancelShortcuts(i, false);
+            }
+        }
+
+        private void SetCancelShortcuts(int index, bool enabled)
+        {
+            if (CancelInputWrappers != null && index < CancelInputWrappers.Length && CancelInputWrappers[index] != null)
+                CancelInputWrappers[index].enabled = enabled;
+            if (ExitInputWrappers != null && index < ExitInputWrappers.Length && ExitInputWrappers[index] != null)
+                ExitInputWrappers[index].enabled = enabled;
         }
     }
 }

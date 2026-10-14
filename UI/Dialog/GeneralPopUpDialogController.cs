@@ -46,8 +46,6 @@ namespace UnityCommonEx
         {
             base.OnInit();
 
-            EnsureInputActionWrapper(BackgroundButton);
-
             if (Buttons != null)
             {
                 for (int i = 0; i < Buttons.Length && i < ButtonSlotCount; i++)
@@ -334,16 +332,5 @@ namespace UnityCommonEx
             DialogPanel.anchoredPosition += local1 - local0;
         }
 
-        private static void EnsureInputActionWrapper(Button button)
-        {
-            if (button == null)
-                return;
-
-            var wrapper = button.GetComponent<HubbleBubbleButtonInputActionWrapper>();
-            if (wrapper == null)
-                wrapper = button.gameObject.AddComponent<HubbleBubbleButtonInputActionWrapper>();
-            wrapper.Action = HubbleBubbleGameInputAction.Exit;
-            wrapper.Button = button;
-        }
     }
 }

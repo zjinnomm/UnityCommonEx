@@ -7,8 +7,10 @@ namespace UnityCommonEx
 {
     public interface IControllerFocusAvailability { bool HasControllerContent { get; } }
     public interface IControllerFocusHandler { void SetControllerFocus(bool active, PointerEventData pointer); }
+    public interface IControllerSubmitAvailability { bool CanControllerSubmit { get; } }
     public interface IControllerReorderItem
     {
+        bool CanControllerReorder { get; }
         bool BeginControllerReorder();
         void MoveControllerReorder(int direction);
         void FinishControllerReorder(bool commit);
@@ -25,13 +27,14 @@ namespace UnityCommonEx
         public Selectable Control;
         public MonoBehaviour Item;
         public Transform RegionRoot;
-        public bool CancelAction;
-        public int CancelPriority;
         public bool BackgroundAction;
         public bool UsePointerClick;
         public int InitialPriority;
         public float SliderStep;
+        [Tooltip("Optional scroll view controlled while this target is focused. Otherwise uses the nearest parent scroll view.")]
+        public ScrollRect ScrollTarget;
         public bool IsFocused { get; private set; }
+        private readonly Vector3[] rectCorners = new Vector3[4];
         public static readonly List<ControllerFocusTarget> ActiveTargets = new List<ControllerFocusTarget>();
 
         protected virtual void OnEnable() { if (!ActiveTargets.Contains(this)) ActiveTargets.Add(this); }
@@ -138,7 +141,7 @@ namespace UnityCommonEx
 
         public void Activate(PointerEventData pointer)
         {
-            if (!IsAvailable) return;
+            if (!CanActivate) return;
             if (Control is Button button) button.onClick.Invoke();
             else if (Control is Toggle toggle) toggle.isOn = !toggle.isOn;
             else if (Control != null) ExecuteEvents.Execute(Control.gameObject, pointer, ExecuteEvents.submitHandler);
@@ -148,26 +151,84 @@ namespace UnityCommonEx
             else if (EventTarget != null) ExecuteEvents.Execute(EventTarget, pointer, ExecuteEvents.pointerClickHandler);
         }
 
+        public bool CanActivate
+        {
+            get
+            {
+                if (!CanFocus || !IsVisibleInViewport) return false;
+                if (Item is IControllerSubmitAvailability availability && !availability.CanControllerSubmit) return false;
+                if (Control is Slider || Control is Scrollbar) return false;
+                if (Control != null) return Control is Button || Control is Toggle ||
+                    Control is TMPro.TMP_InputField || ExecuteEvents.CanHandleEvent<ISubmitHandler>(Control.gameObject);
+                if (UsePointerClick) return EventTarget != null && EventTarget.activeInHierarchy &&
+                    ExecuteEvents.CanHandleEvent<IPointerClickHandler>(EventTarget);
+                if (Item is UIListItemController) return true;
+                return EventTarget != null && EventTarget.activeInHierarchy &&
+                    ExecuteEvents.CanHandleEvent<IPointerClickHandler>(EventTarget);
+            }
+        }
+
+        public ScrollRect GetScrollTarget() => ScrollTarget != null ? ScrollTarget : GetComponentInParent<ScrollRect>();
+
+        public static RectTransform GetViewport(ScrollRect scroll) =>
+            scroll.viewport != null ? scroll.viewport : scroll.transform as RectTransform;
+
+        public static Bounds GetRectBounds(RectTransform rect, RectTransform relativeTo, Vector3[] corners)
+        {
+            rect.GetWorldCorners(corners);
+            var bounds = new Bounds(relativeTo.InverseTransformPoint(corners[0]), Vector3.zero);
+            for (int i = 1; i < 4; i++) bounds.Encapsulate(relativeTo.InverseTransformPoint(corners[i]));
+            return bounds;
+        }
+
+        public bool IsVisibleInViewport
+        {
+            get
+            {
+                if (Rect == null || !ScreenRect.Overlaps(new Rect(0f, 0f, Screen.width, Screen.height))) return false;
+                foreach (var scroll in Rect.GetComponentsInParent<ScrollRect>())
+                {
+                    if (!scroll.isActiveAndEnabled || scroll.content == null || !Rect.IsChildOf(scroll.content)) continue;
+                    var viewport = GetViewport(scroll);
+                    if (viewport == null) continue;
+                    Bounds bounds = GetRectBounds(Rect, viewport, rectCorners);
+                    Rect view = viewport.rect;
+                    // Oversized targets remain usable while their center is visible.
+                    if (!FitsViewport(bounds.min.x, bounds.max.x, view.xMin, view.xMax) ||
+                        !FitsViewport(bounds.min.y, bounds.max.y, view.yMin, view.yMax)) return false;
+                }
+                return true;
+            }
+        }
+
+        private static bool FitsViewport(float min, float max, float viewMin, float viewMax) =>
+            max - min > viewMax - viewMin + 1f
+                ? (min + max) * 0.5f >= viewMin && (min + max) * 0.5f <= viewMax
+                : min >= viewMin - 0.5f && max <= viewMax + 0.5f;
+
         public void EnsureVisible()
         {
-            var scroll = GetComponentInParent<ScrollRect>();
-            if (scroll == null || scroll.content == null || scroll.viewport == null) return;
-            Bounds bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.viewport, Rect);
-            Rect viewport = scroll.viewport.rect;
-            Vector2 offset = Vector2.zero;
-            if (scroll.vertical)
+            foreach (var scroll in Rect.GetComponentsInParent<ScrollRect>())
             {
-                if (bounds.max.y > viewport.yMax) offset.y = viewport.yMax - bounds.max.y;
-                else if (bounds.min.y < viewport.yMin) offset.y = viewport.yMin - bounds.min.y;
+                var view = GetViewport(scroll);
+                if (!scroll.isActiveAndEnabled || scroll.content == null || view == null || !Rect.IsChildOf(scroll.content)) continue;
+                Bounds bounds = GetRectBounds(Rect, view, rectCorners);
+                Rect viewport = view.rect;
+                Vector2 offset = Vector2.zero;
+                if (scroll.vertical)
+                {
+                    if (bounds.max.y > viewport.yMax) offset.y = viewport.yMax - bounds.max.y;
+                    else if (bounds.min.y < viewport.yMin) offset.y = viewport.yMin - bounds.min.y;
+                }
+                if (scroll.horizontal)
+                {
+                    if (bounds.min.x < viewport.xMin) offset.x = viewport.xMin - bounds.min.x;
+                    else if (bounds.max.x > viewport.xMax) offset.x = viewport.xMax - bounds.max.x;
+                }
+                scroll.StopMovement();
+                Vector3 world = view.TransformVector(offset);
+                scroll.content.anchoredPosition += (Vector2)scroll.content.parent.InverseTransformVector(world);
             }
-            if (scroll.horizontal)
-            {
-                if (bounds.min.x < viewport.xMin) offset.x = viewport.xMin - bounds.min.x;
-                else if (bounds.max.x > viewport.xMax) offset.x = viewport.xMax - bounds.max.x;
-            }
-            scroll.StopMovement();
-            Vector3 world = scroll.viewport.TransformVector(offset);
-            scroll.content.anchoredPosition += (Vector2)scroll.content.parent.InverseTransformVector(world);
         }
     }
 }
