@@ -194,7 +194,9 @@ namespace UnityCommonEx
                 float forward = Vector2.Dot(delta, direction);
                 if (forward < 1f) continue;
                 float sideways = Mathf.Abs(delta.x * direction.y - delta.y * direction.x);
-                float score = forward + sideways * 3f + sideways * sideways / Mathf.Max(forward, 1f);
+                float score = forward + sideways * sideways / Mathf.Max(forward, 1f);
+                // Staggered grids need the adjacent row to win over an aligned target two rows away.
+                if (!focused.PreferNearestInDirection) score += sideways * 3f;
                 if (candidate.RegionRoot != focused.RegionRoot) score += 100f;
                 if (score >= bestScore) continue;
                 bestScore = score;

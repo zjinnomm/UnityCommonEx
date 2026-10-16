@@ -27,6 +27,8 @@ namespace UnityCommonEx
         public Selectable Control;
         public MonoBehaviour Item;
         public Transform RegionRoot;
+        [Tooltip("Prefer nearby targets over column alignment when navigating a staggered grid.")]
+        public bool PreferNearestInDirection;
         public bool BackgroundAction;
         public bool UsePointerClick;
         public int InitialPriority;
