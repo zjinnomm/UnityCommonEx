@@ -70,7 +70,7 @@ namespace UnityCommonEx
         {
             get
             {
-                if (!Focusable || !IsAvailable) return false;
+                if (!Focusable || !IsAvailable || !IsVisibleThroughMasks(true)) return false;
                 foreach (var group in GetComponentsInParent<ControllerFocusGroup>())
                     if (group.isActiveAndEnabled && !group.Focusable) return false;
                 return true;
@@ -187,7 +187,8 @@ namespace UnityCommonEx
         {
             get
             {
-                if (Rect == null || !ScreenRect.Overlaps(new Rect(0f, 0f, Screen.width, Screen.height))) return false;
+                if (Rect == null || !ScreenRect.Overlaps(new Rect(0f, 0f, Screen.width, Screen.height)) ||
+                    !IsVisibleThroughMasks(false)) return false;
                 foreach (var scroll in Rect.GetComponentsInParent<ScrollRect>())
                 {
                     if (!scroll.isActiveAndEnabled || scroll.content == null || !Rect.IsChildOf(scroll.content)) continue;
@@ -201,6 +202,39 @@ namespace UnityCommonEx
                 }
                 return true;
             }
+        }
+
+        private bool IsVisibleThroughMasks(bool allowScrolling)
+        {
+            var scrolls = allowScrolling ? Rect.GetComponentsInParent<ScrollRect>() : null;
+            foreach (var mask in Rect.GetComponentsInParent<RectMask2D>())
+                if (mask.isActiveAndEnabled && mask.rectTransform != Rect &&
+                    !FitsMask(mask.rectTransform, mask.padding, scrolls)) return false;
+            foreach (var mask in Rect.GetComponentsInParent<Mask>())
+                if (mask.MaskEnabled() && mask.rectTransform != Rect &&
+                    !FitsMask(mask.rectTransform, Vector4.zero, scrolls)) return false;
+            return true;
+        }
+
+        private bool FitsMask(RectTransform mask, Vector4 padding, ScrollRect[] scrolls)
+        {
+            RectTransform target = Rect;
+            if (scrolls != null)
+                foreach (var scroll in scrolls)
+                {
+                    if (!scroll.isActiveAndEnabled || scroll.content == null || !Rect.IsChildOf(scroll.content)) continue;
+                    var viewport = GetViewport(scroll);
+                    if (viewport == null || (viewport != mask && !viewport.IsChildOf(mask))) continue;
+                    // Scrollable entries remain reachable only while their viewport is visible through outer masks.
+                    target = viewport;
+                }
+            Bounds bounds = GetRectBounds(target, mask, rectCorners);
+            Rect view = mask.rect;
+            view = UnityEngine.Rect.MinMaxRect(view.xMin + padding.x, view.yMin + padding.y,
+                view.xMax - padding.z, view.yMax - padding.w);
+            return view.width > 0f && view.height > 0f &&
+                FitsViewport(bounds.min.x, bounds.max.x, view.xMin, view.xMax) &&
+                FitsViewport(bounds.min.y, bounds.max.y, view.yMin, view.yMax);
         }
 
         private static bool FitsViewport(float min, float max, float viewMin, float viewMax) =>
