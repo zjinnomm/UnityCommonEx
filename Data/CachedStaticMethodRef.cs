@@ -26,8 +26,9 @@ namespace UnityCommonEx
 
         /// <summary>
         /// Resolves and caches the referenced static method using the required signature.
+        /// Callers can explicitly allow additional return types for legacy functions.
         /// </summary>
-        public void Init(Type[] parameterTypes, Type returnType, string errorContext = null)
+        public void Init(Type[] parameterTypes, Type returnType, string errorContext = null, params Type[] compatibleReturnTypes)
         {
             if (string.IsNullOrEmpty(Function))
                 return;
@@ -68,9 +69,14 @@ namespace UnityCommonEx
                 return;
             }
 
-            if (methodInfo.ReturnType != returnType && !(returnType == typeof(UnlockProgress) && methodInfo.ReturnType == typeof(bool)))
+            bool isCompatibleReturnType = compatibleReturnTypes != null &&
+                Array.IndexOf(compatibleReturnTypes, methodInfo.ReturnType) >= 0;
+            if (methodInfo.ReturnType != returnType && !isCompatibleReturnType)
             {
-                LogUtil.Error($"{errorContext}: Method '{methodName}' in class '{className}' must return {returnType.Name} for Function '{Function}'");
+                string expectedReturnTypes = returnType.Name;
+                if (compatibleReturnTypes != null && compatibleReturnTypes.Length > 0)
+                    expectedReturnTypes += " or " + string.Join(" or ", Array.ConvertAll(compatibleReturnTypes, type => type.Name));
+                LogUtil.Error($"{errorContext}: Method '{methodName}' in class '{className}' must return {expectedReturnTypes} for Function '{Function}'");
                 return;
             }
 
